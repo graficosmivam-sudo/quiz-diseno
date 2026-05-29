@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Evaluación — Área de Diseño Gráfico</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #051C3F 0%, #1883FF 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header h1 { color: #051C3F; font-size: 32px; margin-bottom: 10px; }
+        .header p { color: #666; font-size: 14px; }
+        
+        .applicant-bar {
+            background: #e0f2fe;
+            border: 1px solid #bae6fd;
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: #0369a1;
+        }
+        .btn-small {
+            padding: 6px 14px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            background: #0284c7;
+            color: white;
+            transition: background 0.2s;
+        }
+        .btn-small:hover { background: #0369a1; }
+        .btn-small.btn-danger { background: #dc2626; }
+        .btn-small.btn-danger:hover { background: #b91c1c; }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #444; }
+        .form-control { width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; }
+        .form-control:focus { border-color: #1883FF; }
+        
+        .tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        .tab-btn {
+            padding: 10px 20px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .tab-btn:hover { border-color: #1883FF; color: #1883FF; }
+        .tab-btn.active { background: #1883FF; color: white; border-color: #1883FF; }
+        .tab-btn.completed { border-color: #22C55E; color: #166534; background: #f0fdf4; }
+        .tab-btn.completed.active { background: #22C55E; color: white; border-color: #22C55E; }
+        
+        .quiz-panel { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .quiz-header { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #f0f0f0; }
+        .quiz-header h2 { color: #051C3F; font-size: 24px; margin-bottom: 8px; }
+        .quiz-header p { color: #666; font-size: 14px; }
+        .quiz-meta { display: flex; gap: 20px; font-size: 12px; color: #999; margin-top: 10px; }
+        .badge { padding: 4px 12px; border-radius: 20px; background: #f0f0f0; }
+        
+        .progress-bar { background: #f0f0f0; height: 6px; border-radius: 3px; margin-bottom: 20px; overflow: hidden; }
+        .progress-fill { background: linear-gradient(90deg, #1883FF, #F5A800); height: 100%; transition: width 0.3s; }
+        .progress-text { font-size: 12px; color: #999; text-align: right; margin-top: 5px; }
+        
+        .question { margin-bottom: 30px; padding: 20px; background: #f9f9f9; border-radius: 8px; border-left: 4px solid #1883FF; }
+        .question.vf { border-left-color: #F5A800; }
+        .question.case { border-left-color: #9333EA; }
+        .question-type { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+        .question-text { font-size: 16px; color: #333; margin-bottom: 15px; line-height: 1.6; }
+        .question-case { background: rgba(147, 51, 234, 0.08); padding: 12px; border-left: 3px solid #9333EA; border-radius: 0 6px 6px 0; margin: 15px 0; font-size: 14px; color: #555; font-style: italic; line-height: 1.5; }
+        .case-question { font-style: normal; font-weight: 500; color: #333; margin-bottom: 10px; }
+        
+        .options { display: flex; flex-direction: column; gap: 10px; }
+        .option { padding: 12px 16px; background: white; border: 1.5px solid #ddd; border-radius: 6px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px; font-size: 14px; }
+        .option:hover:not(:disabled) { border-color: #1883FF; background: #f8fbff; }
+        .option.selected { border-color: #1883FF; background: #f0f7ff; font-weight: 500; }
+        .option.correct { border-color: #22C55E; background: #f0fdf4; color: #166534; }
+        .option.wrong { border-color: #EF4444; background: #fef2f2; color: #991b1b; opacity: 0.7; }
+        .option.revealed { border-color: #22C55E; background: #f0fdf4; opacity: 0.6; }
+        .option:disabled { cursor: default; }
+        .option-key { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; background: #f0f0f0; font-weight: 600; font-size: 12px; color: #666; flex-shrink: 0; }
+        .option.selected .option-key { background: #1883FF; color: white; }
+        .option.correct .option-key { background: #22C55E; color: white; }
+        .option.wrong .option-key { background: #EF4444; color: white; }
+        
+        .vf-buttons { display: flex; gap: 12px; margin-top: 10px; }
+        .vf-btn { flex: 1; padding: 12px; border: 1.5px solid #ddd; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; background: white; }
+        .vf-btn:hover:not(:disabled) { border-color: #1883FF; background: #f8fbff; }
+        .vf-btn.selected { border-color: #1883FF; background: #f0f7ff; }
+        .vf-btn.correct { border-color: #22C55E; background: #f0fdf4; color: #166534; }
+        .vf-btn.wrong { border-color: #EF4444; background: #fef2f2; color: #991b1b; opacity: 0.7; }
+        .vf-btn.revealed { border-color: #22C55E; background: #f0fdf4; opacity: 0.6; }
+        .vf-btn:disabled { cursor: default; }
+        
+        .feedback { margin-top: 12px; padding: 12px 14px; border-left: 4px solid; border-radius: 0 4px 4px 0; font-size: 13px; line-height: 1.6; display: none; }
+        .feedback.show { display: block; }
+        .feedback.correct { border-color: #22C55E; background: #f0fdf4; color: #166534; }
+        .feedback.wrong { border-color: #EF4444; background: #fef2f2; color: #991b1b; }
+        .feedback strong { display: block; font-size: 12px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .submit-btn { padding: 14px 32px; background: #051C3F; color: white; border: none; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; margin-top: 30px; width: 100%; transition: all 0.3s; }
+        .submit-btn:hover:not(:disabled) { background: #0d2848; transform: translateY(-1px); }
+        .submit-btn:disabled { opacity: 0.4; cursor: default; }
+        
+        .results { background: white; padding: 40px; border-radius: 8px; text-align: center; margin-top: 20px; display: none; }
+        .results.show { display: block; }
+        .score-circle { width: 120px; height: 120px; margin: 0 auto 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 48px; font-weight: 700; color: white; }
+        .score-circle.excellent { background: #F5A800; }
+        .score-circle.good { background: #1883FF; }
+        .score-circle.needs-work { background: #EF4444; }
+        .score-label { font-size: 24px; font-weight: 600; color: #333; margin-bottom: 10px; }
+        .score-message { color: #666; line-height: 1.6; margin-bottom: 20px; }
+        
+        .breakdown { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 30px 0; }
+        .breakdown-item { padding: 15px; background: #f9f9f9; border-radius: 6px; }
+        .breakdown-item strong { display: block; font-size: 24px; color: #051C3F; margin-bottom: 5px; }
+        .breakdown-item span { font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .action-buttons { display: flex; gap: 12px; justify-content: center; margin-top: 30px; }
+        .btn { padding: 12px 28px; border-radius: 6px; border: 1.5px solid; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.3s; }
+        .btn-primary { background: #F5A800; color: white; border-color: #F5A800; }
+        .btn-primary:hover { background: #c87800; border-color: #c87800; }
+        
+        /* Efecto de carga */
+        .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; margin-left: 10px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Quiz de Evaluación</h1>
+        <p>Área de Diseño Gráfico — Departamento de Multimedia</p>
+    </div>
+    
+    <div id="register-screen" class="quiz-panel" style="display: none; max-width: 500px; margin: 40px auto;">
+        <div class="quiz-header">
+            <h2>Ingreso del Aspirante</h2>
+            <p>Escribe tus datos tal cual los ingresaste la primera vez. Tu progreso semanal se guardará de forma automática.</p>
+        </div>
+        <div class="form-group">
+            <label>Nombre y Apellido *</label>
+            <input type="text" id="app-name" class="form-control" placeholder="Ej: Alejandro Marcano">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+            <div class="form-group">
+                <label>Edad *</label>
+                <input type="number" id="app-age" class="form-control" placeholder="Ej: 26">
+            </div>
+            <div class="form-group">
+                <label>Fecha de Nacimiento *</label>
+                <input type="date" id="app-dob" class="form-control">
+            </div>
+        </div>
+        <button class="submit-btn" style="margin-top: 15px;" onclick="saveRegistration()">Ingresar a mis Evaluaciones →</button>
+    </div>
+
+    <div id="main-interface" style="display: none;">
+        <div class="applicant-bar">
+            <div><strong>Aspirante Activo:</strong> <span id="active-applicant-text">---</span></div>
+            <div>
+                <button class="btn-small btn-danger" onclick="logoutApplicant()">Salir de mi sesión</button>
+            </div>
+        </div>
+        
+        <div class="tabs" id="tabs"></div>
+        <div id="quizzes" style="display: block;"></div>
+    </div>
+</div>
+
+<script>
+// ==========================================
+// CONFIGURACIÓN: PEGA TU ENLACE DE GOOGLE AQUÍ
+// ==========================================
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxhPT1zCWXqUC3_AY2jBGsZ_ULqJ4DJOjj_xZRm3_2yik0SQ85eGyhIXo--3sa3UMp-PQ/exec"; 
+
+const SESSIONS = [
+  {
+    id: 1, title: "¿Qué es el Diseño Gráfico?", fase: "FASE 1", mode: "Presencial", desc: "Evalúa la comprensión del diseño como comunicación visual estratégica.",
+    questions: [
+      { id: "1-1", type: "vf", text: "El diseño gráfico es principalmente una disciplina de decoración visual; su objetivo central es que las piezas se vean bonitas.", answer: false, feedbackCorrect: "El diseño gráfico es comunicación visual estratégica: su propósito es transmitir un mensaje específico con intención.", feedbackWrong: "Incorrecto. El diseño gráfico es comunicación estratégica, no decoración. Un buen diseño funciona e informa; no solo se ve bien." },
+      { id: "1-2", type: "mc", text: "¿Cuál describe mejor el rol del diseñador gráfico dentro de un ministerio?", options: [ { key: "A", text: "Crear las piezas más originales según sus preferencias personales." }, { key: "B", text: "Comunicar el mensaje de la iglesia de forma efectiva, sirviéndose del diseño como herramienta de servicio." }, { key: "C", text: "Copiar el estilo de iglesias grandes o famosas." }, { key: "D", text: "Producir piezas lo más rápido posible para cubrir la demanda." } ], answer: "B", feedbackCorrect: "El diseñador en el ministerio es comunicador y servidor. Su trabajo pone en alto el mensaje sobre sus preferencias personales.", feedbackWrong: "La respuesta correcta es B. El diseñador debe poner el mensaje del ministerio por encima de sus gustos personales." },
+      { id: "1-3", type: "vf", text: "En el flujo de trabajo correcto, se debe abrir Photoshop primero y luego pensar en el mensaje y la audiencia.", answer: false, feedbackCorrect: "Correcto. El flujo siempre empieza con el briefing. Photoshop es la herramienta de la última etapa, no la primera.", feedbackWrong: "Incorrecto. Abrir Photoshop antes de definir el mensaje es un error frecuente. Primero va el Briefing." },
+      { id: "1-4", type: "mc", text: "¿Cuál es el orden correcto del flujo de trabajo básico de un diseñador?", options: [ { key: "A", text: "Abrir Photoshop → diseñar → mostrar al encargado → exportar." }, { key: "B", text: "Briefing → referencia visual → boceto → producción → revisión → exportación." }, { key: "C", text: "Buscar inspiración → diseñar → entregar sin revisión." }, { key: "D", text: "Exportar → revisar → producir → boceto." } ], answer: "B", feedbackCorrect: "¡Correcto! El flujo profesional comienza con el briefing y pasa por revisiones antes de la exportación.", feedbackWrong: "La respuesta correcta es B. El flujo estructural correcto es: Briefing → Referencia → Boceto → Producción → Revisión → Exportación." },
+      { id: "1-5", type: "case", caseText: "El ministerio necesita un flyer para un retiro. El voluntario abre Photoshop de inmediato, pone una foto que le gustó y escribe el nombre del evento con fuente decorativa. Al publicarlo, la congregación no puede leer la fecha ni el lugar del retiro.", text: "¿Qué paso del flujo de trabajo omitido causó este problema?", options: [ { key: "A", text: "No usó Photoshop correctamente." }, { key: "B", text: "No realizó el briefing ni la revisión antes de entregar." }, { key: "C", text: "Eligió una fotografía inapropiada." }, { key: "D", text: "Debió usar una fuente diferente." } ], answer: "B", feedbackCorrect: "Exacto. Sin briefing no se aclaró la información obligatoria, y sin revisión los errores de legibilidad pasaron desapercibidos.", feedbackWrong: "La respuesta correcta es B. El problema de raíz se debió a la total ausencia de briefing y control de revisión." },
+      { id: "1-6", type: "vf", text: "Un flyer de iglesia no necesita incluir un llamado a la acción (CTA) porque el evento habla por sí mismo.", answer: false, feedbackCorrect: "Correcto. Todo flyer debe incluir un CTA claro ('¡Inscríbete!', 'Acompáñanos'). Sin CTA, la pieza informa pero no genera acción.", feedbackWrong: "Incorrecto. El CTA es un elemento obligatorio. Sin él, el receptor sabe que algo ocurre pero no sabe qué hacer." }
+    ]
+  },
+  {
+    id: 2, title: "Principios Básicos de Composición", fase: "FASE 1", mode: "Virtual", desc: "Evalúa el conocimiento sobre jerarquía visual, contraste, espacio negativo, tipografía y modos de color.",
+    questions: [
+      { id: "2-1", type: "mc", text: "¿Qué es la jerarquía visual en diseño gráfico?", options: [ { key: "A", text: "El uso de muchos colores para hacer el diseño interesante." }, { key: "B", text: "El orden en que el ojo percibe los elementos, guiado por diferencias de tamaño, peso y color." }, { key: "C", text: "Colocar el logo siempre en el centro del diseño." }, { key: "D", text: "Usar la misma fuente para todos los textos." } ], answer: "B", feedbackCorrect: "La jerarquía visual es fundamental: guía la mirada del lector de lo más relevante a lo secundario secuencialmente.", feedbackWrong: "Incorrecto. La jerarquía visual guía al lector ordenadamente usando contrastes de tamaño, grosor y color." },
+      { id: "2-2", type: "vf", text: "El espacio negativo (espacio en blanco) es un desperdicio en el diseño y siempre debe rellenarse con más elementos.", answer: false, feedbackCorrect: "El espacio negativo es un elemento de diseño clave: otorga aire, elegancia y descanso visual a la composición.", feedbackWrong: "Falso. El espacio en blanco es crucial; sin él, las piezas se saturan y el mensaje se vuelve ilegible." },
+      { id: "2-3", type: "case", caseText: "Un voluntario diseña un flyer para el retiro juvenil. Usa texto amarillo sobre fondo blanco para el nombre del evento porque 'combina con los colores del ministerio'. Al imprimir el flyer, casi nadie puede leer el título.", text: "¿Qué principio de diseño violó el voluntario?", options: [ { key: "A", text: "Balance: el diseño está desbalanceado hacia la derecha." }, { key: "B", text: "Contraste: texto claro sobre fondo claro tiene contraste insuficiente para ser legible." }, { key: "C", text: "Jerarquía: debió poner el texto en el centro." }, { key: "D", text: "Tipografía: la fuente elegida no es adecuada." } ], answer: "B", feedbackCorrect: "Exacto. El contraste óptimo entre el texto y el fondo es la regla de oro elemental para la legibilidad.", feedbackWrong: "Incorrecto. Violó el contraste. Elementos claros sobre fondos claros anulan por completo la legibilidad." },
+      { id: "2-4", type: "mc", text: "Para diseño de impresión se usa CMYK. Para diseño en pantalla (redes sociales) se usa:", options: [ { key: "A", text: "También CMYK, no hay diferencia." }, { key: "B", text: "HSL (Hue, Saturation, Lightness)." }, { key: "C", text: "RGB (Red, Green, Blue)." }, { key: "D", text: "Escala de grises para asegurar compatibilidad." } ], answer: "C", feedbackCorrect: "RGB es el modo nativo para pantallas de dispositivos digitales.", feedbackWrong: "Incorrecto. Se debe usar RGB. El formato CMYK en pantallas distorsiona notablemente los colores originales." },
+      { id: "2-5", type: "vf", text: "Se pueden usar 5 o 6 fuentes tipográficas en un mismo diseño para darle variedad y dinamismo visual.", answer: false, feedbackCorrect: "Correcto. La regla profesional estipula un límite de 2 a 3 fuentes como máximo por composición.", feedbackWrong: "Falso. El exceso tipográfico causa caos visual. La variedad estructural se logra con pesos (Bold, Regular, Light) de una misma familia." },
+      { id: "2-6", type: "mc", text: "Los colores azul y naranja son complementarios. ¿Qué efecto visual genera usarlos juntos?", options: [ { key: "A", text: "Armonía suave y cohesión porque se mezclan visualmente." }, { key: "B", text: "Máximo contraste y vibración visual, ya que son opuestos en la rueda cromática." }, { key: "C", text: "Un efecto monocromático que transmite sobriedad." }, { key: "D", text: "Confusión visual, por eso deben evitarse." } ], answer: "B", feedbackCorrect: "Los colores opuestos complementarios generan el mayor impacto visual y contraste directo.", feedbackWrong: "Incorrecto. Generan un contraste y realce recíproco máximo al situarse en lados opuestos del círculo cromático." }
+    ]
+  },
+  {
+    id: 3, title: "Introducción a Adobe Photoshop", fase: "FASE 1", mode: "Presencial", desc: "Evalúa el conocimiento de la interfaz, sistema de capas, resoluciones, formatos y atajos.",
+    questions: [
+      { id: "3-1", type: "vf", text: "En Adobe Photoshop, el sistema de capas permite editar cada elemento del diseño de forma independiente sin afectar los demás.", answer: true, feedbackCorrect: "Las capas funcionan como acetatos independientes superpuestos, permitiendo aislar por completo cada edición.", feedbackWrong: "Incorrecto. Es verdadero. El sistema de capas es vital exactamente para editar sin alterar el resto del lienzo." },
+      { id: "3-2", type: "mc", text: "¿Qué resolución (DPI) se debe usar para un flyer que será impreso físicamente?", options: [ { key: "A", text: "72 DPI — igual que para redes sociales." }, { key: "B", text: "150 DPI es suficiente." }, { key: "C", text: "300 DPI como mínimo, para garantizar nitidez en la impresión." }, { key: "D", text: "La resolución no importa, la impresora la ajusta." } ], answer: "C", feedbackCorrect: "300 DPI es el estándar métrico internacional para impresión de alta calidad en papel.", feedbackWrong: "Incorrecto. Debe ser obligatoriamente 300 DPI para evitar que los elementos salgan pixelados al imprimirse." },
+      { id: "3-3", type: "case", caseText: "Una voluntaria diseña un carrusel sin separar los elementos en capas — todo el diseño está aplanado en una sola capa. El encargado le pide cambiar el color del fondo de azul a blanco.", text: "¿Qué problema encontrará?", options: [ { key: "A", text: "Ninguno, el cambio es simple." }, { key: "B", text: "No podrá aislar el fondo sin afectar el texto, porque todo está fusionado." }, { key: "C", text: "Photoshop no permite cambiar colores de fondo una vez guardado." }, { key: "D", text: "Deberá reinstalar Photoshop para recuperar las capas." } ], answer: "B", feedbackCorrect: "Aplanar las capas funde los píxeles imposibilitando cambios posteriores rápidos de fondo.", feedbackWrong: "Incorrecto. Al estar acoplado todo en un solo plano, aislar los fondos destruirá o manchará las tipografías superiores." },
+      { id: "3-4", type: "vf", text: "El archivo PSD de Photoshop es el formato de entrega final que se envía por redes sociales o WhatsApp.", answer: false, feedbackCorrect: "El PSD guarda las capas de edición de trabajo. Para la entrega final se debe exportar comprimido en JPG o PNG.", feedbackWrong: "Falso. El formato PSD es un archivo máster de edición. Nunca se envía para su publicación directo en redes." },
+      { id: "3-5", type: "mc", text: "¿Para qué sirve el atajo Ctrl+T (Cmd+T en Mac) en Photoshop?", options: [ { key: "A", text: "Crear una nueva capa de texto." }, { key: "B", text: "Activar Transformación libre: mover, escalar o rotar el elemento." }, { key: "C", text: "Guardar el documento en formato TIFF." }, { key: "D", text: "Seleccionar toda la imagen con el lazo." } ], answer: "B", feedbackCorrect: "Ctrl+T despliega los nodos de transformación libre. Es de los comandos más utilizados.", feedbackWrong: "Incorrecto. Se encarga de abrir las opciones de Transformación Libre sobre la capa seleccionada." },
+      { id: "3-6", type: "mc", text: "Para exportar un logo con fondo transparente, ¿qué formato de archivo se usa?", options: [ { key: "A", text: "JPG, porque tiene la mejor calidad." }, { key: "B", text: "PDF, para que se vea igual en cualquier dispositivo." }, { key: "C", text: "PNG, porque admite transparencia en el fondo." }, { key: "D", text: "PSD, para que el cliente pueda editarlo." } ], answer: "C", feedbackCorrect: "El formato PNG almacena el canal alfa permitiendo guardar transparencias vacías alrededor del diseño.", feedbackWrong: "Incorrecto. JPG no soporta transparencias. Para conservar fondos vacíos se debe exportar obligatoriamente en PNG." }
+    ]
+  },
+  {
+    id: 4, title: "Herramientas Esenciales de Photoshop", fase: "FASE 2", mode: "Virtual", desc: "Evalúa herramientas de selección, capas de ajuste no destructivas y flujos de exportación.",
+    questions: [
+      { id: "4-1", type: "mc", text: "¿Cuál es la ventaja principal de las Capas de Ajuste frente a aplicar cambios directamente sobre la imagen?", options: [ { key: "A", text: "Son más rápidas de aplicar." }, { key: "B", text: "Son no destructivas: pueden modificarse o eliminarse sin alterar la imagen original." }, { key: "C", text: "Generan archivos más pequeños." }, { key: "D", text: "Solo funcionan con fotografías." } ], answer: "B", feedbackCorrect: "El flujo de edición no destructiva permite reajustar los valores en cualquier momento sin dañar los píxeles base.", feedbackWrong: "Incorrecto. Su valor fundamental radica en que operan de manera no destructiva sobre la pieza gráfica." },
+      { id: "4-2", type: "vf", text: "En la herramienta Varita Mágica, reducir la Tolerancia hace que seleccione un rango de colores más amplio.", answer: false, feedbackCorrect: "Correcto. A menor tolerancia, la selección se vuelve mucho más estricta y restrictiva con los tonos parecidos.", feedbackWrong: "Falso. La tolerancia baja encoge el espectro; los valores altos expanden el rango de colores admisibles." },
+      { id: "4-3", type: "case", caseText: "Un voluntario necesita recortar la figura de una persona de una fotografía con fondo azul claro sólido. Usa el Lazo a mano alzada y el resultado tiene bordes irregulares.", text: "¿Qué herramienta hubiera sido más eficiente?", options: [ { key: "A", text: "Marco rectangular, porque recorta con bordes más limpios." }, { key: "B", text: "Varita mágica o Selección de objeto: el fondo sólido facilita la selección automática." }, { key: "C", text: "Pincel de borrar, pintando manualmente." }, { key: "D", text: "No es posible hacer recortes precisos para principiantes." } ], answer: "B", feedbackCorrect: "Los fondos unicolor homogéneos se eliminan óptimamente con herramientas automatizadas como Varita Mágica.", feedbackWrong: "La respuesta correcta es B. Al ser fondos planos homogéneos, la Varita Mágica ahorra minutos de trazados manuales erráticos." },
+      { id: "4-4", type: "mc", text: "¿Cuál es la diferencia entre 'Texto de punto' y 'Texto de área' en Photoshop?", options: [ { key: "A", text: "No hay diferencia, los dos funcionan igual." }, { key: "B", text: "El texto de punto se expande en una línea indefinidamente; el texto de área se ajusta dentro de un cuadro delimitado." }, { key: "C", text: "El texto de área no puede tener formato tipográfico." }, { key: "D", text: "El texto de punto no puede cambiarse de color." } ], answer: "B", feedbackCorrect: "Texto de punto sirve para títulos cortos y el texto de área controla párrafos empaquetados en cajas tipográficas.", feedbackWrong: "Incorrecto. El de punto sigue de largo sin saltos de línea automáticos; el de área respeta el marco contenedor." },
+      { id: "4-5", type: "vf", text: "Para tener el trabajo guardado con capas Y poder publicar en redes sociales, basta con guardar solo el archivo PSD.", answer: false, feedbackCorrect: "Cierto. Se necesitan co-existir ambos: el PSD máster de edición interna y el JPG/PNG renderizado exportado.", feedbackWrong: "Falso. Las redes sociales rechazan la subida de archivos pesados PSD microscópicos estructurados en capas." },
+      { id: "4-6", type: "mc", text: "¿Cuál es la ruta correcta en Photoshop para exportar optimizado para redes sociales?", options: [ { key: "A", text: "Archivo → Guardar → seleccionar JPG." }, { key: "B", text: "Capa → Exportar como JPG." }, { key: "C", text: "Archivo → Exportar → Exportar como... → seleccionar JPG o PNG." }, { key: "D", text: "Imagen → Modo → Exportar para web." } ], answer: "C", feedbackCorrect: "La ventana 'Exportar como...' brinda controles de compresión y metadatos excelentes para canales de internet.", feedbackWrong: "Incorrecto. La ruta estandarizada profesional es Archivo → Exportar → Exportar como..." }
+    ]
+  },
+  {
+    id: 5, title: "Diseño de Flyers y Publicidad", fase: "FASE 2", mode: "Presencial", desc: "Evalúa la estructura de un flyer, overlay, Call to Action y coherencia de identidad.",
+    questions: [
+      { id: "5-1", type: "mc", text: "¿Cuál de estos elementos NO es indispensable en todo flyer de un evento de iglesia?", options: [ { key: "A", text: "Nombre del evento (titular)." }, { key: "B", text: "Fecha, hora y lugar." }, { key: "C", text: "Fotografía del pastor o líder del evento." }, { key: "D", text: "Logo de la iglesia o ministerio." } ], answer: "C", feedbackCorrect: "Correcto. La foto del líder es situacional, mientras que los datos de fecha, lugar e identidad son pilares obligatorios.", feedbackWrong: "Incorrecto. La fotografía de un ponente no es obligatoria para la funcionalidad informativa básica del evento." },
+      { id: "5-2", type: "vf", text: "La técnica del overlay consiste en colocar un rectángulo semitransparente sobre una fotografía para mejorar la legibilidad del texto superpuesto.", answer: true, feedbackCorrect: "El overlay oscurece o tiñe detalles fotográficos caóticos para independizar y rescatar las fuentes superiores.", feedbackWrong: "Incorrecto. Es totalmente verdadero. El overlay salva la legibilidad tipográfica cuando los fondos fotográficos tienen mucho contraste." },
+      { id: "5-3", type: "case", caseText: "Un voluntario diseña un flyer para el retiro juvenil: nombre del retiro en tamaño pequeño (esquina superior), foto de montaña sin overlay, número de teléfono en letras gigantes al centro, tres fuentes distintas, sin logo de la iglesia.", text: "¿Cuántos problemas de diseño hay?", options: [ { key: "A", text: "Ninguno, el diseño está bien estructurado." }, { key: "B", text: "Un problema: falta el logo." }, { key: "C", text: "Al menos 4 problemas: jerarquía incorrecta, texto ilegible sin overlay, exceso tipográfico y ausencia de identidad visual." }, { key: "D", text: "Solo hay un problema de tipografía." } ], answer: "C", feedbackCorrect: "Excelente ojo crítico. El diseño carece de jerarquía funcional, legibilidad básica, mesura tipográfica e identidad de marca.", feedbackWrong: "La respuesta correcta es C. Se combinan múltiples fallas estructurales destructivas para el mensaje de comunicación." },
+      { id: "5-4", type: "mc", text: "¿Por qué es importante mantener la identidad visual de la iglesia en todas las piezas gráficas?", options: [ { key: "A", text: "Por requisito legal." }, { key: "B", text: "Genera reconocimiento, coherencia visual y construye la imagen del ministerio ante la congregación." }, { key: "C", text: "Para que el trabajo del diseñador sea más rápido." }, { key: "D", text: "Solo importa en eventos grandes." } ], answer: "B", feedbackCorrect: "La consistencia gráfica genera seriedad, pertenencia comunitaria y afianza el canal institucional frente a la audiencia.", feedbackWrong: "La respuesta correcta es B. La coherencia marcaria sostiene y amalgama la credibilidad comunicativa institucional." },
+      { id: "5-5", type: "vf", text: "Si el texto del flyer queda muy apretado, la solución correcta es reducir los márgenes al mínimo y eliminar el espacio entre elementos.", answer: false, feedbackCorrect: "Cierto. Pegar textos a los límites asfixia el formato. Siempre se debe jerarquizar, acortar texto o usar más hojas.", feedbackWrong: "Falso. Eliminar márgenes destruye la estética y legibilidad. Menos información clara comunica muchísimo más." },
+      { id: "5-6", type: "mc", text: "¿Qué es un 'Call to Action' (CTA) en un flyer?", options: [ { key: "A", text: "El nombre del diseñador que creó la pieza." }, { key: "B", text: "Una instrucción clara que le dice al receptor qué hacer: inscribirse, compartir, llamar, etc." }, { key: "C", text: "El color de fondo del flyer." }, { key: "D", text: "El tamaño del titular principal." } ], answer: "B", feedbackCorrect: "El CTA dirige al usuario e indica el siguiente paso lógico que debe ejecutar en respuesta al flyer.", feedbackWrong: "Incorrecto. El CTA (Llamado a la acción) empuja al espectador a interactuar con metas reales fijas." }
+    ]
+  },
+  {
+    id: 6, title: "Carruseles para Redes Sociales", fase: "FASE 2", mode: "Presencial", desc: "Evalúa formatos, narrativa visual, coherencia entre slides y flujos eficientes.",
+    questions: [
+      { id: "6-1", type: "mc", text: "¿Cuáles son las dimensiones correctas para un carrusel cuadrado (1:1) en Instagram?", options: [ { key: "A", text: "800 x 800 px a 300 DPI." }, { key: "B", text: "1080 x 1080 px a 72 DPI." }, { key: "C", text: "1200 x 1200 px a 150 DPI." }, { key: "D", text: "720 x 720 px a 72 DPI." } ], answer: "B", feedbackCorrect: "1080x1080 px a 72 DPI otorga una compresión balanceada óptima para flujos web móviles.", feedbackWrong: "La respuesta correcta es B. El formato estándar oficial para post cuadrados digitales es 1080x1080 px a 72 DPI." },
+      { id: "6-2", type: "vf", text: "En un carrusel de Instagram, el primer slide es el más importante porque es el único que el usuario ve antes de decidir si desliza o no.", answer: true, feedbackCorrect: "El primer slide funciona como portada gancho. Si falla en retener, el resto de las diapositivas son ignoradas.", feedbackWrong: "Incorrecto. Es verdadero. La portada porta el gancho de retención de lectura inicial." },
+      { id: "6-3", type: "mc", text: "¿Qué hace que un carrusel sea visualmente coherentemente entre sus slides?", options: [ { key: "A", text: "Usar un estilo visual distinto en cada slide para mantener el interés." }, { key: "B", text: "Mantener la misma paleta de colores, tipografías, márgenes y elementos gráficos." }, { key: "C", text: "Que cada slide tenga exactamente la misma cantidad de texto." }, { key: "D", text: "Usar siempre fondo blanco en todos los slides." } ], answer: "B", feedbackCorrect: "La repetición rítmica armónica de paletas, márgenes fijas y tipografías da unidad narrativa compacta al carrusel.", feedbackWrong: "La respuesta correcta es B. Cambiar estilos drásticamente rompe la percepción de continuidad de la publicación." },
+      { id: "6-4", type: "case", caseText: "Un carrusel de 6 slides anuncia el programa de células. El slide 1 es un gancho visual. Los slides 2-5 explican información clave. El slide 6 solo repite la misma foto del slide 1 sin ningún texto.", text: "¿Qué le falta al slide 6?", options: [ { key: "A", text: "Nada, repetir la imagen crea un buen efecto circular." }, { key: "B", text: "Un cierre con Call to Action claro ('Escríbenos para unirte') y el logo del ministerio." }, { key: "C", text: "Un resumen de toda la información de los slides anteriores." }, { key: "D", text: "La foto debe cambiarse por una completamente diferente." } ], answer: "B", feedbackCorrect: "El slide de desenlace obligatoriamente exige el cierre marcario institucional y un CTA resolutivo.", feedbackWrong: "La respuesta correcta es B. Dejar un slide final vacío echa a perder la oportunidad de capturar conversiones reales." },
+      { id: "6-5", type: "vf", text: "Para crear un carrusel de 5 slides, la forma más eficiente es diseñar el primer slide completo y duplicar ese archivo 4 veces, modificando solo el contenido variable.", answer: true, feedbackCorrect: "Construir sobre plantillas maestras rígidas agiliza enormemente los tiempos de entrega industrial de contenidos.", feedbackWrong: "Incorrecto. Es verdadero. Duplicar una estructura preestablecida unificada garantiza simetría y ahorra tiempo." },
+      { id: "6-6", type: "mc", text: "¿En qué contexto del ministerio es más efectivo usar un carrusel en lugar de un solo flyer?", options: [ { key: "A", text: "Para anunciar solo la hora del culto dominical." }, { key: "B", text: "Para una enseñanza con varios puntos, un recap de evento o explicar cómo unirse paso a paso." }, { key: "C", text: "Para mostrar el logo actualizado de la iglesia." }, { key: "D", text: "Un solo flyer siempre es mejor; los carruseles generan menos alcance." } ], answer: "B", feedbackCorrect: "Los carruseles potencian narrativas pedagógicas extensas fragmentadas en estaciones de lectura cómoda.", feedbackWrong: "La respuesta correcta es B. Su fuerte reside en desglosar pasos informativos, listas educativas o resúmenes complejos." }
+    ]
+  }
+];
+
+let state = { currentSession: 0, answers: {}, submitted: false, score: null };
+
+function getDB() { 
+    return JSON.parse(localStorage.getItem('quiz_db')) || {}; 
+}
+
+function saveToDB(sessIdx, scoreData, answers) {
+    const db = getDB();
+    db[sessIdx] = { completed: true, score: scoreData, answers: answers };
+    localStorage.setItem('quiz_db', JSON.stringify(db));
+}
+
+function isSessionCompleted(sessIdx) {
+    const db = getDB();
+    return db[sessIdx] && db[sessIdx].completed === true;
+}
+
+function checkRegistration() {
+    const current = localStorage.getItem('current_applicant');
+    if (current) {
+        document.getElementById('register-screen').style.display = 'none';
+        document.getElementById('main-interface').style.display = 'block';
+        const applicant = JSON.parse(current);
+        document.getElementById('active-applicant-text').textContent = `${applicant.name} (${applicant.age} años)`;
+        init();
+    } else {
+        document.getElementById('register-screen').style.display = 'block';
+        document.getElementById('main-interface').style.display = 'none';
+    }
+}
+
+function saveRegistration() {
+    const name = document.getElementById('app-name').value.trim();
+    const age = document.getElementById('app-age').value.trim();
+    const dob = document.getElementById('app-dob').value;
+    
+    if (!name || !age || !dob) {
+        alert("Por favor, ingresa todos tus datos para poder comenzar.");
+        return;
+    }
+    
+    // Almacenamos localmente para la sesión del navegador actual
+    const applicantData = { name, age, dob, dateSaved: new Date().toLocaleDateString() };
+    localStorage.setItem('current_applicant', JSON.stringify(applicantData));
+    
+    // Dejamos la DB local limpia para este intento
+    localStorage.setItem('quiz_db', JSON.stringify({}));
+    
+    checkRegistration();
+}
+
+function logoutApplicant() {
+    if(confirm("¿Estás seguro de que deseas salir? Asegúrate de haber presionado 'Enviar a la nube' en las sesiones completadas para no perder tus notas.")) {
+        localStorage.removeItem('current_applicant');
+        localStorage.removeItem('quiz_db');
+        checkRegistration();
+    }
+}
+
+// ENVÍO DE DATOS CENTRALIZADOS EN LA NUBE (Google Sheets)
+function sendDataToCloud(sessIdx, btnElement) {
+    const current = JSON.parse(localStorage.getItem('current_applicant'));
+    if(!current) return;
+    
+    const db = getDB();
+    
+    // Crear el paquete estructurado
+    const payload = {
+        name: current.name,
+        age: current.age,
+        dob: current.dob,
+        date: current.dateSaved,
+        sessions: db
+    };
+    
+    // Interfaz visual de carga
+    const originalText = btnElement.innerHTML;
+    btnElement.disabled = true;
+    btnElement.innerHTML = 'Enviando respuestas... <span class="spinner"></span>';
+    
+    if(GOOGLE_SCRIPT_URL === "AQUÍ_PEGA_TU_URL_DE_GOOGLE") {
+        alert("Error de configuración: No has pegado la URL de tu Google Apps Script en la línea 157 del código.");
+        btnElement.disabled = false;
+        btnElement.innerHTML = originalText;
+        return;
+    }
+
+    fetch(GOOGLE_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors", // Evita problemas de CORS comunes en peticiones estáticas gratis
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    })
+    .then(() => {
+        alert("¡Éxito! Tu progreso se ha guardado de forma segura en la base de datos central de la nube.");
+        btnElement.innerHTML = "✓ Respuestas Guardadas en la Nube";
+        btnElement.style.background = "#166534";
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Hubo un problema de conexión. El progreso quedó guardado temporalmente en este dispositivo; por favor intenta enviarlo de nuevo.");
+        btnElement.disabled = false;
+        btnElement.innerHTML = originalText;
+    });
+}
+
+// --- MOTOR DEL QUIZ ---
+function init() {
+  renderTabs();
+  renderQuizzes();
+  let firstIncomplete = 0;
+  for(let i=0; i<SESSIONS.length; i++) {
+      if(!isSessionCompleted(i)){ firstIncomplete = i; break; }
+  }
+  showSession(firstIncomplete);
+}
+
+function renderTabs() {
+  const tabsEl = document.getElementById('tabs');
+  tabsEl.innerHTML = '';
+  SESSIONS.forEach((sess, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn';
+    btn.id = `tab-btn-${i}`;
+    btn.textContent = `Sesión ${String(sess.id).padStart(2, '0')}`;
+    if(isSessionCompleted(i)) { btn.classList.add('completed'); btn.innerHTML += ' ✓'; }
+    btn.onclick = () => showSession(i);
+    tabsEl.appendChild(btn);
+  });
+}
+
+function renderQuizzes() {
+  const container = document.getElementById('quizzes');
+  container.innerHTML = '';
+  SESSIONS.forEach((sess, sessIdx) => {
+    const panel = document.createElement('div');
+    panel.className = 'quiz-panel';
+    panel.id = `quiz-${sessIdx}`;
+    panel.style.display = 'none';
+    panel.innerHTML = renderQuizzes_Single(sess, sessIdx);
+    container.appendChild(panel);
+  });
+}
+
+function renderQuestion(q, sessIdx, qIdx) {
+  let html = `<div class="question ${q.type}" id="q-${q.id}">`;
+  const typeLabel = q.type === 'vf' ? 'Verdadero / Falso' : q.type === 'mc' ? 'Opción Múltiple' : 'Caso de Estudio';
+  html += `<div class="question-type">${typeLabel}</div>`;
+  if (q.type === 'case') html += `<div class="question-case"><div class="case-question">${q.caseText}</div></div>`;
+  html += `<div class="question-text">${q.text}</div>`;
+  
+  if (q.type === 'vf') {
+    html += `
+      <div class="vf-buttons">
+        <button class="vf-btn" id="opt-${q.id}-T" onclick="selectAnswer('${q.id}', true, ${sessIdx})">✓ VERDADERO</button>
+        <button class="vf-btn" id="opt-${q.id}-F" onclick="selectAnswer('${q.id}', false, ${sessIdx})">✗ FALSO</button>
+      </div>
+    `;
+  } else {
+    html += `<div class="options">`;
+    q.options.forEach(opt => {
+      html += `
+        <button class="option" id="opt-${q.id}-${opt.key}" onclick="selectAnswer('${q.id}', '${opt.key}', ${sessIdx})">
+          <span class="option-key">${opt.key}</span><span>${opt.text}</span>
+        </button>
+      `;
+    });
+    html += `</div>`;
+  }
+  html += `<div class="feedback" id="fb-${q.id}"></div></div>`;
+  return html;
+}
+
+function showSession(idx) {
+  state.answers = {}; state.submitted = false; state.score = null; state.currentSession = idx;
+  document.querySelectorAll('.quiz-panel').forEach(p => p.style.display = 'none');
+  const currentPanel = document.getElementById(`quiz-${idx}`);
+  if(currentPanel) currentPanel.style.display = 'block';
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+  if(document.querySelectorAll('.tab-btn')[idx]) document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+  
+  const sess = SESSIONS[idx];
+  if(currentPanel) currentPanel.innerHTML = renderQuizzes_Single(sess, idx);
+
+  if(isSessionCompleted(idx)) restoreCompletedSession(idx);
+  else updateProgress(idx);
+}
+
+function selectAnswer(qId, answer, sessIdx) {
+  if (state.submitted || isSessionCompleted(sessIdx)) return;
+  state.answers[qId] = answer;
+  const q = findQuestion(qId);
+  if(!q) return;
+  
+  if (q.type === 'vf') {
+    document.getElementById(`opt-${qId}-T`).classList.toggle('selected', answer === true);
+    document.getElementById(`opt-${qId}-F`).classList.toggle('selected', answer === false);
+  } else {
+    q.options.forEach(opt => {
+      document.getElementById(`opt-${qId}-${opt.key}`).classList.toggle('selected', answer === opt.key);
+    });
+  }
+  updateProgress(sessIdx);
+  checkSubmitReady(sessIdx);
+}
+
+function updateProgress(sessIdx) {
+  const sess = SESSIONS[sessIdx];
+  const answered = sess.questions.filter(q => state.answers[q.id] !== undefined).length;
+  const pct = (answered / sess.questions.length) * 100;
+  if(document.getElementById(`prog-${sessIdx}`)) document.getElementById(`prog-${sessIdx}`).style.width = pct + '%';
+  if(document.getElementById(`prog-text-${sessIdx}`)) document.getElementById(`prog-text-${sessIdx}`).textContent = `${answered} / ${sess.questions.length}`;
+}
+
+function checkSubmitReady(sessIdx) {
+  const sess = SESSIONS[sessIdx];
+  const allAnswered = sess.questions.every(q => state.answers[q.id] !== undefined);
+  if(document.getElementById(`submit-${sessIdx}`)) document.getElementById(`submit-${sessIdx}`).disabled = !allAnswered;
+}
+
+function submitQuiz(sessIdx) {
+  state.submitted = true;
+  const sess = SESSIONS[sessIdx];
+  let correct = 0;
+  
+  sess.questions.forEach(q => {
+    const userAnswer = state.answers[q.id];
+    const isCorrect = userAnswer === q.answer;
+    if (isCorrect) correct++;
+    applyQuestionStyles(q, userAnswer, isCorrect);
+    showFeedback(q, isCorrect);
+  });
+  
+  if(document.getElementById('submit-' + sessIdx)) document.getElementById('submit-' + sessIdx).style.display = 'none';
+  const pct = Math.round((correct / sess.questions.length) * 100);
+  state.score = { correct, total: sess.questions.length, pct };
+  
+  saveToDB(sessIdx, state.score, state.answers);
+  const tabBtn = document.getElementById(`tab-btn-${sessIdx}`);
+  if (tabBtn && !tabBtn.classList.contains('completed')) {
+      tabBtn.classList.add('completed');
+      tabBtn.innerHTML = `Sesión ${String(sess.id).padStart(2, '0')} ✓`;
+  }
+  showResults(sessIdx, correct, sess.questions.length, pct);
+}
+
+function restoreCompletedSession(sessIdx) {
+    const db = getDB();
+    const savedData = db[sessIdx];
+    state.submitted = true; state.answers = savedData.answers; state.score = savedData.score;
+    const sess = SESSIONS[sessIdx];
+    
+    sess.questions.forEach(q => {
+        const userAnswer = state.answers[q.id];
+        const isCorrect = userAnswer === q.answer;
+        if (q.type === 'vf') {
+            if(document.getElementById(`opt-${q.id}-T`)) document.getElementById(`opt-${q.id}-T`).classList.toggle('selected', userAnswer === true);
+            if(document.getElementById(`opt-${q.id}-F`)) document.getElementById(`opt-${q.id}-F`).classList.toggle('selected', userAnswer === false);
+        } else {
+            if(document.getElementById(`opt-${q.id}-${userAnswer}`)) document.getElementById(`opt-${q.id}-${userAnswer}`).classList.add('selected');
+        }
+        applyQuestionStyles(q, userAnswer, isCorrect);
+        showFeedback(q, isCorrect);
+    });
+    if(document.getElementById(`prog-${sessIdx}`)) document.getElementById(`prog-${sessIdx}`).style.width = '100%';
+    if(document.getElementById(`prog-text-${sessIdx}`)) document.getElementById(`prog-text-${sessIdx}`).textContent = `${sess.questions.length} / ${sess.questions.length}`;
+    if(document.getElementById(`submit-${sessIdx}`)) document.getElementById(`submit-${sessIdx}).style.display = 'none'`;
+    showResults(sessIdx, savedData.score.correct, savedData.score.total, savedData.score.pct);
+}
+
+function applyQuestionStyles(q, userAnswer, isCorrect) {
+  if (q.type === 'vf') {
+    const tBtn = document.getElementById(`opt-${q.id}-T`);
+    const fBtn = document.getElementById(`opt-${q.id}-F`);
+    if(tBtn && fBtn) {
+      tBtn.disabled = true; fBtn.disabled = true;
+      if (q.answer === true) tBtn.classList.add(isCorrect ? 'correct' : 'revealed');
+      else fBtn.classList.add(isCorrect ? 'correct' : 'revealed');
+      if (userAnswer !== q.answer) {
+        if (userAnswer === true) tBtn.classList.add('wrong'); else fBtn.classList.add('wrong');
+      }
+    }
+  } else {
+    q.options.forEach(opt => {
+      const btn = document.getElementById(`opt-${q.id}-${opt.key}`);
+      if(btn) {
+        btn.disabled = true;
+        if (opt.key === q.answer) btn.classList.add(isCorrect ? 'correct' : 'revealed');
+        else if (opt.key === userAnswer && !isCorrect) btn.classList.add('wrong');
+      }
+    });
+  }
+}
+
+function showFeedback(q, isCorrect) {
+  const fb = document.getElementById(`fb-${q.id}`);
+  if(fb) { fb.classList.add('show', isCorrect ? 'correct' : 'wrong'); fb.innerHTML = `<strong>${isCorrect ? '✓ Correcto' : '✗ Incorrecto'}</strong>${isCorrect ? q.feedbackCorrect : q.feedbackWrong}`; }
+}
+
+function showResults(sessIdx, correct, total, pct) {
+  let level, label, msg;
+  if (pct >= 83) { level = 'excellent'; label = 'Dominio sólido'; msg = 'Comprensión excelente del tema analizado.'; }
+  else if (pct >= 50) { level = 'good'; label = 'Buen avance'; msg = 'Comprensión general estable, con pequeños detalles a reforzar.'; }
+  else { level = 'needs-work'; label = 'Necesita refuerzo'; msg = 'Se sugiere repasar los tópicos base de la sesión.'; }
+  
+  const resultsEl = document.getElementById(`results-${sessIdx}`);
+  if(!resultsEl) return;
+  resultsEl.classList.add('show');
+  
+  resultsEl.innerHTML = `
+    <div class="score-circle ${level}">${pct}%</div>
+    <div class="score-label">${label}</div>
+    <div class="score-message">${msg}</div>
+    <div class="breakdown">
+      <div class="breakdown-item"><strong style="color: #22C55E">${correct}</strong><span>Correctas</span></div>
+      <div class="breakdown-item"><strong style="color: #EF4444">${total - correct}</strong><span>Incorrectas</span></div>
+      <div class="breakdown-item"><strong style="color: #F5A800">${pct}%</strong><span>Nota</span></div>
+    </div>
+    <div class="action-buttons">
+       <button class="btn btn-primary" style="background:#166534; border-color:#166534; width:100%;" onclick="sendDataToCloud(${sessIdx}, this)">Enviar Notas a la Nube (Google Sheet)</button>
+    </div>
+  `;
+}
+
+function findQuestion(qId) {
+  for (const sess of SESSIONS) { const q = sess.questions.find(q => q.id === qId); if (q) return q; }
+  return null;
+}
+
+function renderQuizzes_Single(sess, sessIdx) {
+  let html = `
+    <div class="quiz-header">
+      <h2>Sesión ${String(sess.id).padStart(2, '0')} — ${sess.title}</h2>
+      <div class="quiz-meta"><span class="badge">${sess.fase}</span><span class="badge">${sess.mode}</span><span class="badge">${sess.questions.length} preguntas</span></div>
+      <p style="margin-top: 12px; color: #666;">${sess.desc}</p>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="prog-${sessIdx}" style="width: 0%"></div></div>
+    <div class="progress-text" id="prog-text-${sessIdx}">0 / ${sess.questions.length}</div>
+  `;
+  sess.questions.forEach((q, qIdx) => { html += renderQuestion(q, sessIdx, qIdx); });
+  html += `<button class="submit-btn" id="submit-${sessIdx}" onclick="submitQuiz(${sessIdx})" disabled>Evaluar Sesión →</button><div class="results" id="results-${sessIdx}"></div>`;
+  return html;
+}
+
+window.addEventListener('DOMContentLoaded', checkRegistration);
+</script>
+</body>
+</html>
