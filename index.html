@@ -504,6 +504,7 @@ function checkSubmitReady(sessIdx) {
   if(document.getElementById(`submit-${sessIdx}`)) document.getElementById(`submit-${sessIdx}`).disabled = !allAnswered;
 }
 
+// Sustituye tu función submitQuiz por esta versión:
 function submitQuiz(sessIdx) {
   state.submitted = true;
   const sess = SESSIONS[sessIdx];
@@ -527,62 +528,16 @@ function submitQuiz(sessIdx) {
       tabBtn.classList.add('completed');
       tabBtn.innerHTML = `Sesión ${String(sess.id).padStart(2, '0')} ✓`;
   }
+  
   showResults(sessIdx, correct, sess.questions.length, pct);
+  
+  // AQUÍ ESTÁ LA MAGIA: Llamamos al envío automático
+  // Buscamos un elemento botón ficticio para pasarle la referencia al proceso de envío
+  const tempBtn = { innerHTML: 'Enviando...' }; 
+  sendDataToCloud(sessIdx, tempBtn);
 }
 
-function restoreCompletedSession(sessIdx) {
-    const db = getDB();
-    const savedData = db[sessIdx];
-    state.submitted = true; state.answers = savedData.answers; state.score = savedData.score;
-    const sess = SESSIONS[sessIdx];
-    
-    sess.questions.forEach(q => {
-        const userAnswer = state.answers[q.id];
-        const isCorrect = userAnswer === q.answer;
-        if (q.type === 'vf') {
-            if(document.getElementById(`opt-${q.id}-T`)) document.getElementById(`opt-${q.id}-T`).classList.toggle('selected', userAnswer === true);
-            if(document.getElementById(`opt-${q.id}-F`)) document.getElementById(`opt-${q.id}-F`).classList.toggle('selected', userAnswer === false);
-        } else {
-            if(document.getElementById(`opt-${q.id}-${userAnswer}`)) document.getElementById(`opt-${q.id}-${userAnswer}`).classList.add('selected');
-        }
-        applyQuestionStyles(q, userAnswer, isCorrect);
-        showFeedback(q, isCorrect);
-    });
-    if(document.getElementById(`prog-${sessIdx}`)) document.getElementById(`prog-${sessIdx}`).style.width = '100%';
-    if(document.getElementById(`prog-text-${sessIdx}`)) document.getElementById(`prog-text-${sessIdx}`).textContent = `${sess.questions.length} / ${sess.questions.length}`;
-    if(document.getElementById(`submit-${sessIdx}`)) document.getElementById(`submit-${sessIdx}`).style.display = 'none';
-    showResults(sessIdx, savedData.score.correct, savedData.score.total, savedData.score.pct);
-}
-
-function applyQuestionStyles(q, userAnswer, isCorrect) {
-  if (q.type === 'vf') {
-    const tBtn = document.getElementById(`opt-${q.id}-T`);
-    const fBtn = document.getElementById(`opt-${q.id}-F`);
-    if(tBtn && fBtn) {
-      tBtn.disabled = true; fBtn.disabled = true;
-      if (q.answer === true) tBtn.classList.add(isCorrect ? 'correct' : 'revealed');
-      else fBtn.classList.add(isCorrect ? 'correct' : 'revealed');
-      if (userAnswer !== q.answer) {
-        if (userAnswer === true) tBtn.classList.add('wrong'); else fBtn.classList.add('wrong');
-      }
-    }
-  } else {
-    q.options.forEach(opt => {
-      const btn = document.getElementById(`opt-${q.id}-${opt.key}`);
-      if(btn) {
-        btn.disabled = true;
-        if (opt.key === q.answer) btn.classList.add(isCorrect ? 'correct' : 'revealed');
-        else if (opt.key === userAnswer && !isCorrect) btn.classList.add('wrong');
-      }
-    });
-  }
-}
-
-function showFeedback(q, isCorrect) {
-  const fb = document.getElementById(`fb-${q.id}`);
-  if(fb) { fb.classList.add('show', isCorrect ? 'correct' : 'wrong'); fb.innerHTML = `<strong>${isCorrect ? '✓ Correcto' : '✗ Incorrecto'}</strong>${isCorrect ? q.feedbackCorrect : q.feedbackWrong}`; }
-}
-
+// Y ahora, simplifica tu función showResults para que no cree el botón extra:
 function showResults(sessIdx, correct, total, pct) {
   let level, label, msg;
   if (pct >= 83) { level = 'excellent'; label = 'Dominio sólido'; msg = 'Comprensión excelente del tema analizado.'; }
@@ -591,7 +546,6 @@ function showResults(sessIdx, correct, total, pct) {
   
   const resultsEl = document.getElementById(`results-${sessIdx}`);
   if(!resultsEl) return;
-  
   resultsEl.classList.add('show');
   
   resultsEl.innerHTML = `
@@ -603,9 +557,7 @@ function showResults(sessIdx, correct, total, pct) {
       <div class="breakdown-item"><strong style="color: #EF4444">${total - correct}</strong><span>Incorrectas</span></div>
       <div class="breakdown-item"><strong style="color: #F5A800">${pct}%</strong><span>Nota</span></div>
     </div>
-    <div class="action-buttons">
-       <button class="btn btn-primary" style="background:#166534; border-color:#166534; width:100%;" onclick="sendDataToCloud(${sessIdx}, this)">Enviar Notas a la Nube (Google Sheet)</button>
-    </div>
+    <p style="font-size:12px; color:#888; margin-top:15px;">Tus resultados han sido guardados automáticamente en nuestro sistema.</p>
   `;
 }
 function findQuestion(qId) {
