@@ -329,6 +329,8 @@ function sendDataToCloud(sessIdx, btnElement) {
     if(!current) return;
     
     const db = getDB();
+    
+    // Crear el paquete estructurado
     const payload = {
         name: current.name,
         age: current.age,
@@ -337,10 +339,12 @@ function sendDataToCloud(sessIdx, btnElement) {
         sessions: db
     };
     
+    // Interfaz visual de carga
     const originalText = btnElement.innerHTML;
     btnElement.disabled = true;
     btnElement.innerHTML = 'Enviando... <span class="spinner"></span>';
     
+    // AQUÍ SE ENVÍA A TU URL
     fetch(GOOGLE_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors", 
