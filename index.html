@@ -191,7 +191,7 @@
 
 <script>
 // ==========================================
-// CONFIGURACIÓN: PEGA TU ENLACE DE GOOGLE AQUÍ
+// CONFIGURACIÓN: ENLACE DE GOOGLE APPS SCRIPT
 // ==========================================
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxhPT1zCWXqUC3_AY2jBGsZ_ULqJ4DJOjj_xZRm3_2yik0SQ85eGyhIXo--3sa3UMp-PQ/exec"; 
 
@@ -224,7 +224,7 @@ const SESSIONS = [
       { id: "3-1", type: "vf", text: "En Adobe Photoshop, el sistema de capas permite editar cada elemento del diseño de forma independiente sin afectar los demás.", answer: true, feedbackCorrect: "Las capas funcionan como acetatos independientes superpuestos, permitiendo aislar por completo cada edición.", feedbackWrong: "Incorrecto. Es verdadero. El sistema de capas es vital exactamente para editar sin alterar el resto del lienzo." },
       { id: "3-2", type: "mc", text: "¿Qué resolución (DPI) se debe usar para un flyer que será impreso físicamente?", options: [ { key: "A", text: "72 DPI — igual que para redes sociales." }, { key: "B", text: "150 DPI es suficiente." }, { key: "C", text: "300 DPI como mínimo, para garantizar nitidez en la impresión." }, { key: "D", text: "La resolución no importa, la impresora la ajusta." } ], answer: "C", feedbackCorrect: "300 DPI es el estándar métrico internacional para impresión de alta calidad en papel.", feedbackWrong: "Incorrecto. Debe ser obligatoriamente 300 DPI para evitar que los elementos salgan pixelados al imprimirse." },
       { id: "3-3", type: "case", caseText: "Una voluntaria diseña un carrusel sin separar los elementos en capas — todo el diseño está aplanado en una sola capa. El encargado le pide cambiar el color del fondo de azul a blanco.", text: "¿Qué problema encontrará?", options: [ { key: "A", text: "Ninguno, el cambio es simple." }, { key: "B", text: "No podrá aislar el fondo sin afectar el texto, porque todo está fusionado." }, { key: "C", text: "Photoshop no permite cambiar colores de fondo una vez guardado." }, { key: "D", text: "Deberá reinstalar Photoshop para recuperar las capas." } ], answer: "B", feedbackCorrect: "Aplanar las capas funde los píxeles imposibilitando cambios posteriores rápidos de fondo.", feedbackWrong: "Incorrecto. Al estar acoplado todo en un solo plano, aislar los fondos destruirá o manchará las tipografías superiores." },
-      { id: "3-4", type: "vf", text: "El archivo PSD de Photoshop es el formato de entrega final que se envía por redes sociales o WhatsApp.", answer: false, feedbackCorrect: "El PSD guarda las capas de edición de trabajo. Para la entrega final se debe exportar comprimido en JPG o PNG.", feedbackWrong: "Falso. El formato PSD es un archivo máster de edición. Nunca se envía para su publicación directo en redes." },
+      { id: "3-4", type: "vf", text: "El archivo PSD de Photoshop es el formato de entrega final que se envía por redes sociales o WhatsApp.", answer: false, feedbackCorrect: "El PSD guarda las capas de edición de trabajo. Para la entrega final se debe exportar comprimido en JPG o PNG.", feedbackWrong: "Falso. El formato PSD es un archivo máster de edición. Nunca se envía para su publicación directa en redes." },
       { id: "3-5", type: "mc", text: "¿Para qué sirve el atajo Ctrl+T (Cmd+T en Mac) en Photoshop?", options: [ { key: "A", text: "Crear una nueva capa de texto." }, { key: "B", text: "Activar Transformación libre: mover, escalar o rotar el elemento." }, { key: "C", text: "Guardar el documento en formato TIFF." }, { key: "D", text: "Seleccionar toda la imagen con el lazo." } ], answer: "B", feedbackCorrect: "Ctrl+T despliega los nodos de transformación libre. Es de los comandos más utilizados.", feedbackWrong: "Incorrecto. Se encarga de abrir las opciones de Transformación Libre sobre la capa seleccionada." },
       { id: "3-6", type: "mc", text: "Para exportar un logo con fondo transparente, ¿qué formato de archivo se usa?", options: [ { key: "A", text: "JPG, porque tiene la mejor calidad." }, { key: "B", text: "PDF, para que se vea igual en cualquier dispositivo." }, { key: "C", text: "PNG, porque admite transparencia en el fondo." }, { key: "D", text: "PSD, para que el cliente pueda editarlo." } ], answer: "C", feedbackCorrect: "El formato PNG almacena el canal alfa permitiendo guardar transparencias vacías alrededor del diseño.", feedbackWrong: "Incorrecto. JPG no soporta transparencias. Para conservar fondos vacíos se debe exportar obligatoriamente en PNG." }
     ]
@@ -344,7 +344,7 @@ function sendDataToCloud(sessIdx, btnElement) {
     btnElement.disabled = true;
     btnElement.innerHTML = 'Enviando respuestas... <span class="spinner"></span>';
     
-    if(GOOGLE_SCRIPT_URL === "AQUÍ_PEGA_TU_URL_DE_GOOGLE") {
+    if(GOOGLE_SCRIPT_URL === "https://script.google.com/macros/s/AKfycbxhPT1zCWXqUC3_AY2jBGsZ_ULqJ4DJOjj_xZRm3_2yik0SQ85eGyhIXo--3sa3UMp-PQ/exec") {
         alert("Error de configuración: No has pegado la URL de tu Google Apps Script en la línea 157 del código.");
         btnElement.disabled = false;
         btnElement.innerHTML = originalText;
@@ -530,7 +530,7 @@ function restoreCompletedSession(sessIdx) {
     });
     if(document.getElementById(`prog-${sessIdx}`)) document.getElementById(`prog-${sessIdx}`).style.width = '100%';
     if(document.getElementById(`prog-text-${sessIdx}`)) document.getElementById(`prog-text-${sessIdx}`).textContent = `${sess.questions.length} / ${sess.questions.length}`;
-    if(document.getElementById(`submit-${sessIdx}`)) document.getElementById(`submit-${sessIdx}).style.display = 'none'`;
+    if(document.getElementById(`submit-${sessIdx}`)) document.getElementById(`submit-${sessIdx}`).style.display = 'none';
     showResults(sessIdx, savedData.score.correct, savedData.score.total, savedData.score.pct);
 }
 
@@ -612,4 +612,3 @@ window.addEventListener('DOMContentLoaded', checkRegistration);
 </script>
 </body>
 </html>
-}
