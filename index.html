@@ -329,8 +329,6 @@ function sendDataToCloud(sessIdx, btnElement) {
     if(!current) return;
     
     const db = getDB();
-    
-    // Crear el paquete estructurado
     const payload = {
         name: current.name,
         age: current.age,
@@ -339,32 +337,24 @@ function sendDataToCloud(sessIdx, btnElement) {
         sessions: db
     };
     
-    // Interfaz visual de carga
     const originalText = btnElement.innerHTML;
     btnElement.disabled = true;
-    btnElement.innerHTML = 'Enviando respuestas... <span class="spinner"></span>';
+    btnElement.innerHTML = 'Enviando... <span class="spinner"></span>';
     
-    if(GOOGLE_SCRIPT_URL === "https://script.google.com/macros/s/AKfycbxhPT1zCWXqUC3_AY2jBGsZ_ULqJ4DJOjj_xZRm3_2yik0SQ85eGyhIXo--3sa3UMp-PQ/exec") {
-        alert("Error de configuración: No has pegado la URL de tu Google Apps Script en la línea 157 del código.");
-        btnElement.disabled = false;
-        btnElement.innerHTML = originalText;
-        return;
-    }
-
     fetch(GOOGLE_SCRIPT_URL, {
         method: "POST",
-        mode: "no-cors", // Evita problemas de CORS comunes en peticiones estáticas gratis
+        mode: "no-cors", 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
     })
     .then(() => {
-        alert("¡Éxito! Tu progreso se ha guardado de forma segura en la base de datos central de la nube.");
-        btnElement.innerHTML = "✓ Respuestas Guardadas en la Nube";
+        alert("¡Éxito! Tus resultados han sido enviados a la hoja de cálculo.");
+        btnElement.innerHTML = "✓ Enviado a Google Sheets";
         btnElement.style.background = "#166534";
     })
     .catch(err => {
         console.error(err);
-        alert("Hubo un problema de conexión. El progreso quedó guardado temporalmente en este dispositivo; por favor intenta enviarlo de nuevo.");
+        alert("Hubo un error al conectar. Verifica que tu script esté desplegado como 'Web App' y con acceso para 'Cualquier usuario'.");
         btnElement.disabled = false;
         btnElement.innerHTML = originalText;
     });
@@ -571,6 +561,7 @@ function showResults(sessIdx, correct, total, pct) {
   
   const resultsEl = document.getElementById(`results-${sessIdx}`);
   if(!resultsEl) return;
+  
   resultsEl.classList.add('show');
   
   resultsEl.innerHTML = `
@@ -587,7 +578,6 @@ function showResults(sessIdx, correct, total, pct) {
     </div>
   `;
 }
-
 function findQuestion(qId) {
   for (const sess of SESSIONS) { const q = sess.questions.find(q => q.id === qId); if (q) return q; }
   return null;
