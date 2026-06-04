@@ -355,8 +355,6 @@ function sendDataToCloud(sessIdx, btnElement) {
     if(!current) return;
     
     const db = getDB();
-    
-    // Crear el paquete estructurado
     const payload = {
         name: current.name,
         age: current.age,
@@ -365,12 +363,14 @@ function sendDataToCloud(sessIdx, btnElement) {
         sessions: db
     };
     
-    // Interfaz visual de carga
-    const originalText = btnElement.innerHTML;
-    btnElement.disabled = true;
-    btnElement.innerHTML = 'Enviando... <span class="spinner"></span>';
+    // Verificamos si btnElement tiene propiedades reales antes de modificarlas
+    const isRealButton = btnElement && btnElement.style;
     
-    // AQUÍ SE ENVÍA A TU URL
+    if (isRealButton) {
+        btnElement.disabled = true;
+        btnElement.innerHTML = 'Enviando...';
+    }
+    
     fetch(GOOGLE_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors", 
@@ -378,18 +378,20 @@ function sendDataToCloud(sessIdx, btnElement) {
         body: JSON.stringify(payload)
     })
     .then(() => {
-        alert("¡Éxito! Tus resultados han sido enviados a la hoja de cálculo.");
-        btnElement.innerHTML = "✓ Enviado a Google Sheets";
-        btnElement.style.background = "#166534";
+        console.log("Datos enviados correctamente");
+        if (isRealButton) {
+            btnElement.innerHTML = "✓ Enviado";
+            btnElement.style.background = "#166534";
+        }
     })
     .catch(err => {
-        console.error(err);
-        alert("Hubo un error al conectar. Verifica que tu script esté desplegado como 'Web App' y con acceso para 'Cualquier usuario'.");
-        btnElement.disabled = false;
-        btnElement.innerHTML = originalText;
+        console.error("Error en envío:", err);
+        if (isRealButton) {
+            btnElement.disabled = false;
+            btnElement.innerHTML = "Reintentar envío";
+        }
     });
 }
-
 // --- MOTOR DEL QUIZ ---
 function init() {
   renderTabs();
