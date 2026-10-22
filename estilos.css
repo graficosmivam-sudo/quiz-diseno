@@ -60,7 +60,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Barra superior */
 .barra { border-bottom: var(--linea) solid var(--negro); background: var(--blanco); position: sticky; top: 0; z-index: 5; }
 .barra .contenedor { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding-block: var(--space-3); }
-.firma { font-family: var(--font-display); text-transform: uppercase; font-size: 20px; line-height: .9; letter-spacing: .5px; text-decoration: none; color: var(--negro); }
+.firma { font-family: var(--font-sans); font-weight: 700; text-transform: uppercase; font-size: 18px; line-height: 1; letter-spacing: .5px; text-decoration: none; color: var(--negro); }
 .firma small { display: block; font-family: var(--font-sans); font-size: 11px; font-weight: 600; letter-spacing: 2px; color: var(--naranja-tinta); margin-top: 4px; }
 .usuario { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
 .usuario__nombre { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
@@ -96,7 +96,7 @@ h2, h3, p { margin: 0; }
 .pastillas { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 /* Avatar con iniciales */
-.avatar { width: 40px; height: 40px; flex: none; border-radius: var(--radius-pill); background: var(--naranja-fondo); color: var(--naranja-tinta); font-family: var(--font-display); font-size: 16px; display: inline-flex; align-items: center; justify-content: center; text-transform: uppercase; }
+.avatar { width: 40px; height: 40px; flex: none; border-radius: var(--radius-pill); background: var(--naranja-fondo); color: var(--naranja-tinta); font-family: var(--font-sans); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; text-transform: uppercase; }
 
 /* Ingreso */
 .ingreso__titular { display: flex; flex-direction: column; gap: var(--space-4); margin-bottom: var(--space-8); }
@@ -139,7 +139,7 @@ textarea.control { min-height: 96px; resize: vertical; line-height: 1.5; }
 
 .pregunta { border-top: var(--linea) solid var(--negro); padding-block: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); }
 .pregunta__tipo { display: flex; gap: var(--space-3); align-items: baseline; }
-.pregunta__numero { font-family: var(--font-display); font-size: 32px; line-height: 1; }
+.pregunta__numero { font-family: var(--font-sans); font-weight: 700; font-size: 28px; line-height: 1; font-variant-numeric: tabular-nums; }
 .pregunta__texto { font-size: 18px; font-weight: 600; line-height: 1.45; }
 .caso { background: var(--gris-nube); border-radius: var(--radius-sm); padding: var(--space-4); font-size: 15px; line-height: 1.6; }
 .opciones { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -207,7 +207,7 @@ textarea.control { min-height: 96px; resize: vertical; line-height: 1.5; }
   .fila-dos, .fila-obs { grid-template-columns: minmax(0, 1fr); }
   .curso__titulo { font-size: 40px; }
   .progreso { top: 66px; }
-  .firma { font-size: 16px; white-space: nowrap; }
+  .firma { font-size: 15px; white-space: nowrap; }
   .destellos { width: 84px; height: 70px; right: var(--space-4); top: var(--space-4); }
 }
 @media (max-width: 480px) {
