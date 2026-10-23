@@ -432,6 +432,14 @@
     return svg;
   }
 
+  /* Textos de las filas «observacion». Por defecto, los del Módulo 01; cada práctica puede cambiarlos.
+     «pregunta» también nombra la columna en la hoja, así que no se cambia en una práctica ya en uso. */
+  function textosObservacion(pr) {
+    return Object.assign({ pregunta: "¿Se repite?", placeholder: "¿Qué observan?", conteo: "se repite" }, pr.observacion || {});
+  }
+  // «Paso 2 · Colores» → «Colores»
+  function sinPrefijo(label) { return String(label).replace(/^.*? · /, ""); }
+
   /* ---------- Vista: práctica en pareja ---------- */
   function vistaPractica(key) {
     var hallado = buscarPractica(key);
@@ -440,6 +448,7 @@
     var p = persona();
     var borradorClave = "mivam_borrador_" + key + "_" + normalizar(p.nombre);
     var borrador = leer(borradorClave, {});
+    var obs = textosObservacion(pr);
     vaciar(raiz);
 
     function control(id, tipo, extra) {
@@ -470,11 +479,11 @@
         }
       } else if (c.tipo === "observacion") {
         var sel = h("select", { class: "control", id: c.id + "-repite", name: c.id + "-repite" },
-          h("option", { value: "", text: "¿Se repite?" }), h("option", { value: "Sí", text: "Sí" }), h("option", { value: "Casi", text: "Casi" }), h("option", { value: "No", text: "No" }));
+          h("option", { value: "", text: obs.pregunta }), h("option", { value: "Sí", text: "Sí" }), h("option", { value: "Casi", text: "Casi" }), h("option", { value: "No", text: "No" }));
         if (borrador[c.id + "-repite"]) sel.value = borrador[c.id + "-repite"];
         sel.addEventListener("change", function () { borrador[sel.id] = sel.value; guardar(borradorClave, borrador); });
         bloque.appendChild(h("div", { class: "campo" }, h("label", { for: c.id, text: c.label }),
-          h("div", { class: "fila-obs" }, control(c.id, "texto", { placeholder: "¿Qué observan?" }), sel)));
+          h("div", { class: "fila-obs" }, control(c.id, "texto", { placeholder: obs.placeholder }), sel)));
       } else {
         bloque.appendChild(h("div", { class: "campo" }, h("label", { for: c.id, text: c.label }),
           c.ayuda ? h("span", { class: "ayuda", text: c.ayuda }) : null, control(c.id, c.tipo)));
@@ -497,7 +506,7 @@
           fields.push({ label: c.label, value: items.join("\n") });
         } else if (c.tipo === "observacion") {
           fields.push({ label: c.label, value: (form.elements[c.id].value || "").trim() });
-          fields.push({ label: c.label + " · ¿Se repite?", value: form.elements[c.id + "-repite"].value });
+          fields.push({ label: c.label + " · " + obs.pregunta, value: form.elements[c.id + "-repite"].value });
         } else {
           fields.push({ label: c.label, value: (form.elements[c.id].value || "").trim() });
         }
@@ -549,10 +558,12 @@
       estado, conteo, muro
     ));
 
+    var obs = textosObservacion(pr);
     var etiquetasObs = pr.campos.filter(function (c) { return c.tipo === "observacion"; });
-    var cMarca = pr.campos.find(function (c) { return c.id === "marca"; });
-    var cTapado = pr.campos.find(function (c) { return c.id === "tapado"; });
-    var cRegla = pr.campos.find(function (c) { return c.id === "regla"; });
+    // La tarjeta de cada pareja muestra los campos con «proyectar»: el primero de tipo texto es el título.
+    var aProyectar = pr.campos.filter(function (c) { return c.proyectar; });
+    var cTitulo = aProyectar.find(function (c) { return c.tipo === "texto"; });
+    var cDetalle = aProyectar.filter(function (c) { return c !== cTitulo; });
 
     function cargar() {
       fetch(GOOGLE_SCRIPT_URL + "?action=practicas&actividad=" + encodeURIComponent(key))
@@ -562,18 +573,17 @@
           estado.textContent = items.length + (items.length === 1 ? " pareja ha enviado" : " parejas han enviado") + " · se actualiza cada 15 segundos";
           vaciar(conteo);
           etiquetasObs.forEach(function (c) {
-            var si = items.filter(function (it) { return it[c.label + " · ¿Se repite?"] === "Sí"; }).length;
-            conteo.appendChild(h("div", null, h("b", { text: si }), c.label.replace(/^Paso 2 · /, "") + " se repite"));
+            var si = items.filter(function (it) { return it[c.label + " · " + obs.pregunta] === "Sí"; }).length;
+            conteo.appendChild(h("div", null, h("b", { text: si }), sinPrefijo(c.label) + " " + obs.conteo));
           });
           vaciar(muro);
           items.slice().reverse().forEach(function (it) {
             muro.appendChild(h("article", { class: "pareja" },
-              h("p", { class: "pareja__marca", text: (cMarca && it[cMarca.label]) || "Sin marca" }),
+              h("p", { class: "pareja__marca", text: (cTitulo && it[cTitulo.label]) || "Sin marca" }),
               h("p", { class: "texto-apoyo", text: it["Integrantes"] || "" }),
-              h("dl", null,
-                cTapado ? [h("dt", { text: "Con el logo tapado" }), h("dd", { text: it[cTapado.label] || "—" })] : null,
-                cRegla ? [h("dt", { text: "Su regla" }), h("dd", { text: it[cRegla.label] || "—" })] : null
-              )
+              h("dl", null, cDetalle.map(function (c) {
+                return [h("dt", { text: typeof c.proyectar === "string" ? c.proyectar : sinPrefijo(c.label) }), h("dd", { text: it[c.label] || "—" })];
+              }))
             ));
           });
         })
