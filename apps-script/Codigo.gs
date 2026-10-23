@@ -11,15 +11,17 @@
  * - Una pestaña por actividad en pareja (por ejemplo «Práctica M01»).
  * - Acepta también el formato de la app anterior, por si alguien envía desde una versión vieja.
  *
- * Versión 2.1: la hoja principal puede ser una tabla de Google Sheets (columnas con tipo).
- *   Las tablas no dejan cambiar el formato de una columna con tipo; el formato ahora es
- *   opcional y nunca impide guardar.
+ * Versión 2.2: la hoja principal puede ser una tabla de Google Sheets (columnas con tipo).
+ *   Las tablas no dejan cambiar el formato de una columna con tipo, y Sheets aplica los cambios
+ *   en lote, así que ese error aparece después y no se puede atrapar con try/catch. Por eso la
+ *   hoja principal nunca recibe formato: las notas se escriben como texto «83%», que Sheets
+ *   reconoce como porcentaje al igual que si se escribiera a mano.
  *
  * Cómo publicarlo: Implementar → Administrar implementaciones → editar (lápiz) →
  * Versión: «Nueva versión» → Implementar. Así la dirección /exec no cambia.
  */
 
-var VERSION = 2.1;
+var VERSION = 2.2;
 var COLUMNAS_SESIONES_FIJAS = { S01: 5, S02: 6, S03: 7, S04: 8, S05: 9, S06: 10 };
 var COL_NOMBRE = 1, COL_EDAD = 2, COL_NACIMIENTO = 3, COL_ACTIVIDAD = 4, COL_PROMEDIO = 11;
 var PRIMERA_COLUMNA_MODULOS = 12; // L
@@ -63,13 +65,12 @@ function guardarQuiz(d) {
   var fila = buscarOCrearPersona(sheet, nombre, d.dob);
   var col = columnaDeSesion(sheet, d.sessionKey, d.columnLabel || d.sessionTitle);
   var celda = sheet.getRange(fila, col);
-  celda.setValue(Number(d.pct) / 100);
-  formatear(celda, '0%');
-  formatear(sheet.getRange(fila, COL_ACTIVIDAD).setValue(new Date()), 'dd/mm/yyyy hh:mm');
+  celda.setValue(porcentaje(d.pct));
+  sheet.getRange(fila, COL_ACTIVIDAD).setValue(new Date());
   actualizarPromedio(sheet, fila);
 
   hoja('Respuestas', ['Fecha', 'Nombre', 'Clave', 'Sesión o módulo', 'Correctas', 'Total', 'Nota', 'Respuestas'])
-    .appendRow([new Date(), nombre, d.sessionKey, d.sessionTitle || '', d.correct, d.total, Number(d.pct) / 100, JSON.stringify(d.answers || {})]);
+    .appendRow([new Date(), nombre, d.sessionKey, d.sessionTitle || '', d.correct, d.total, porcentaje(d.pct), JSON.stringify(d.answers || {})]);
 
   return { status: 'success', message: 'Resultado guardado.', fila: fila };
 }
@@ -83,10 +84,10 @@ function guardarFormatoAnterior(d) {
   for (var i = 0; i < claves.length; i++) {
     var s = d.sessions[i];
     if (s && s.score && s.score.pct !== undefined) {
-      formatear(sheet.getRange(fila, COLUMNAS_SESIONES_FIJAS[claves[i]]).setValue(Number(s.score.pct) / 100), '0%');
+      sheet.getRange(fila, COLUMNAS_SESIONES_FIJAS[claves[i]]).setValue(porcentaje(s.score.pct));
     }
   }
-  formatear(sheet.getRange(fila, COL_ACTIVIDAD).setValue(new Date()), 'dd/mm/yyyy hh:mm');
+  sheet.getRange(fila, COL_ACTIVIDAD).setValue(new Date());
   actualizarPromedio(sheet, fila);
   return { status: 'success', message: 'Datos guardados (formato anterior).' };
 }
@@ -192,7 +193,7 @@ function buscarOCrearPersona(sheet, nombre, dob) {
   }
   var fecha = aFecha(dob);
   if (fecha) {
-    formatear(sheet.getRange(fila, COL_NACIMIENTO).setValue(fecha), 'dd/mm/yyyy');
+    sheet.getRange(fila, COL_NACIMIENTO).setValue(fecha);
     var edad = sheet.getRange(fila, COL_EDAD);
     try {
       edad.setFormula('=IFERROR(DATEDIF(C' + fila + ',TODAY(),"Y"),"")');
@@ -223,7 +224,7 @@ function columnaDeSesion(sheet, clave, etiqueta) {
     if (claveDeEncabezado(enc[c - 1]) === clave) return c;
   }
   var nueva = ultimaCol + 1;
-  negrita(sheet.getRange(1, nueva).setValue(clave + (etiqueta ? ' · ' + etiqueta : '')));
+  sheet.getRange(1, nueva).setValue(clave + (etiqueta ? ' · ' + etiqueta : '')); // sin negrita: la hoja principal no recibe formato
   return nueva;
 }
 
@@ -248,15 +249,15 @@ function actualizarPromedio(sheet, fila) {
   var celda = sheet.getRange(fila, COL_PROMEDIO);
   if (!notas.length) { celda.setValue(''); return; }
   var suma = notas.reduce(function (a, b) { return a + b; }, 0);
-  formatear(celda.setValue(Math.round(suma / notas.length) / 100), '0%');
+  celda.setValue(porcentaje(suma / notas.length));
 }
 
-/** El formato es opcional: en una tabla de Sheets las columnas con tipo no lo dejan cambiar. */
-function formatear(rango, formato) {
-  try { rango.setNumberFormat(formato); } catch (x) {}
-  return rango;
+/** 83 → «83%». Sheets lo guarda como 0,83 con formato de porcentaje, sin pedir formato aparte. */
+function porcentaje(n) {
+  return Math.round(Number(n)) + '%';
 }
 
+/** Solo para las pestañas propias (Respuestas y prácticas), que no son tablas. */
 function negrita(rango) {
   try { rango.setFontWeight('bold'); } catch (x) {}
   return rango;
