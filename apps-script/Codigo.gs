@@ -16,12 +16,14 @@
  *   en lote, así que ese error aparece después y no se puede atrapar con try/catch. Por eso la
  *   hoja principal nunca recibe formato: las notas se escriben como texto «83%», que Sheets
  *   reconoce como porcentaje al igual que si se escribiera a mano.
+ * Versión 2.3: si la columna Promedio tiene fórmula, se respeta. A una persona nueva se le copia
+ *   la fórmula de la fila de arriba; solo sin fórmula el script escribe el promedio.
  *
  * Cómo publicarlo: Implementar → Administrar implementaciones → editar (lápiz) →
  * Versión: «Nueva versión» → Implementar. Así la dirección /exec no cambia.
  */
 
-var VERSION = 2.2;
+var VERSION = 2.3;
 var COLUMNAS_SESIONES_FIJAS = { S01: 5, S02: 6, S03: 7, S04: 8, S05: 9, S06: 10 };
 var COL_NOMBRE = 1, COL_EDAD = 2, COL_NACIMIENTO = 3, COL_ACTIVIDAD = 4, COL_PROMEDIO = 11;
 var PRIMERA_COLUMNA_MODULOS = 12; // L
@@ -247,6 +249,11 @@ function actualizarPromedio(sheet, fila) {
     if (p !== null) notas.push(p);
   }
   var celda = sheet.getRange(fila, COL_PROMEDIO);
+  if (celda.getFormula()) return; // la hoja calcula el promedio: no se pisa la fórmula
+  if (fila > 2) {
+    var deArriba = sheet.getRange(fila - 1, COL_PROMEDIO).getFormulaR1C1();
+    if (deArriba) { celda.setFormulaR1C1(deArriba); return; } // persona nueva: misma fórmula que el resto
+  }
   if (!notas.length) { celda.setValue(''); return; }
   var suma = notas.reduce(function (a, b) { return a + b; }, 0);
   celda.setValue(porcentaje(suma / notas.length));
