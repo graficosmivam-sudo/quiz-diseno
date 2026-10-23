@@ -332,10 +332,11 @@
     }
 
     var estadoEnvio = h("div", { class: "envio" });
-    function pintarEstado(tipo, texto, reintento) {
+    function pintarEstado(tipo, texto, reintento, detalle) {
       vaciar(estadoEnvio);
       if (tipo === "enviando") estadoEnvio.appendChild(h("span", { class: "cargando", "aria-hidden": "true" }));
       estadoEnvio.appendChild(h("p", { class: "aviso " + (tipo === "ok" ? "aviso--ok" : tipo === "error" ? "aviso--error" : "aviso--info"), role: "status", text: texto }));
+      if (detalle) estadoEnvio.appendChild(h("p", { class: "texto-apoyo", text: "Detalle para el líder del área: " + detalle }));
       if (reintento) estadoEnvio.appendChild(h("button", { class: "btn btn--secundario btn--chico", type: "button", onclick: reintento }, "Reintentar envío"));
     }
 
@@ -353,8 +354,8 @@
         desencolar(item.id);
         marcarEnviado(item);
         pintarEstado("ok", "Resultado guardado en el registro del área.");
-      }).catch(function () {
-        pintarEstado("error", "No se pudo guardar todavía. Tu resultado quedó en este dispositivo y se reenviará solo al volver la conexión.", function () { enviarResultado(correctas, pct); });
+      }).catch(function (err) {
+        pintarEstado("error", "No se pudo guardar todavía. Tu resultado quedó en este dispositivo y se reenviará solo al volver la conexión.", function () { enviarResultado(correctas, pct); }, err && err.message);
       });
     }
 

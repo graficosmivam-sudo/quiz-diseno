@@ -11,11 +11,15 @@
  * - Una pestaña por actividad en pareja (por ejemplo «Práctica M01»).
  * - Acepta también el formato de la app anterior, por si alguien envía desde una versión vieja.
  *
+ * Versión 2.1: la hoja principal puede ser una tabla de Google Sheets (columnas con tipo).
+ *   Las tablas no dejan cambiar el formato de una columna con tipo; el formato ahora es
+ *   opcional y nunca impide guardar.
+ *
  * Cómo publicarlo: Implementar → Administrar implementaciones → editar (lápiz) →
  * Versión: «Nueva versión» → Implementar. Así la dirección /exec no cambia.
  */
 
-var VERSION = 2;
+var VERSION = 2.1;
 var COLUMNAS_SESIONES_FIJAS = { S01: 5, S02: 6, S03: 7, S04: 8, S05: 9, S06: 10 };
 var COL_NOMBRE = 1, COL_EDAD = 2, COL_NACIMIENTO = 3, COL_ACTIVIDAD = 4, COL_PROMEDIO = 11;
 var PRIMERA_COLUMNA_MODULOS = 12; // L
@@ -60,8 +64,8 @@ function guardarQuiz(d) {
   var col = columnaDeSesion(sheet, d.sessionKey, d.columnLabel || d.sessionTitle);
   var celda = sheet.getRange(fila, col);
   celda.setValue(Number(d.pct) / 100);
-  celda.setNumberFormat('0%');
-  sheet.getRange(fila, COL_ACTIVIDAD).setValue(new Date()).setNumberFormat('dd/mm/yyyy hh:mm');
+  formatear(celda, '0%');
+  formatear(sheet.getRange(fila, COL_ACTIVIDAD).setValue(new Date()), 'dd/mm/yyyy hh:mm');
   actualizarPromedio(sheet, fila);
 
   hoja('Respuestas', ['Fecha', 'Nombre', 'Clave', 'Sesión o módulo', 'Correctas', 'Total', 'Nota', 'Respuestas'])
@@ -79,10 +83,10 @@ function guardarFormatoAnterior(d) {
   for (var i = 0; i < claves.length; i++) {
     var s = d.sessions[i];
     if (s && s.score && s.score.pct !== undefined) {
-      sheet.getRange(fila, COLUMNAS_SESIONES_FIJAS[claves[i]]).setValue(Number(s.score.pct) / 100).setNumberFormat('0%');
+      formatear(sheet.getRange(fila, COLUMNAS_SESIONES_FIJAS[claves[i]]).setValue(Number(s.score.pct) / 100), '0%');
     }
   }
-  sheet.getRange(fila, COL_ACTIVIDAD).setValue(new Date()).setNumberFormat('dd/mm/yyyy hh:mm');
+  formatear(sheet.getRange(fila, COL_ACTIVIDAD).setValue(new Date()), 'dd/mm/yyyy hh:mm');
   actualizarPromedio(sheet, fila);
   return { status: 'success', message: 'Datos guardados (formato anterior).' };
 }
@@ -101,7 +105,7 @@ function guardarPractica(d) {
     var idx = actuales.indexOf(c.label);
     if (idx === -1) {
       idx = actuales.length;
-      sheet.getRange(1, idx + 1).setValue(c.label).setFontWeight('bold');
+      negrita(sheet.getRange(1, idx + 1).setValue(c.label));
       actuales.push(c.label);
     }
     fila[idx] = c.value;
@@ -156,8 +160,8 @@ function hoja(nombre, encabezados) {
   if (!sheet) {
     sheet = ss.insertSheet(nombre);
     sheet.appendRow(encabezados);
-    sheet.getRange(1, 1, 1, encabezados.length).setFontWeight('bold');
-    sheet.setFrozenRows(1);
+    negrita(sheet.getRange(1, 1, 1, encabezados.length));
+    try { sheet.setFrozenRows(1); } catch (x) {}
   }
   return sheet;
 }
@@ -188,8 +192,13 @@ function buscarOCrearPersona(sheet, nombre, dob) {
   }
   var fecha = aFecha(dob);
   if (fecha) {
-    sheet.getRange(fila, COL_NACIMIENTO).setValue(fecha).setNumberFormat('dd/mm/yyyy');
-    sheet.getRange(fila, COL_EDAD).setFormula('=IFERROR(DATEDIF(C' + fila + ',TODAY(),"Y"),"")');
+    formatear(sheet.getRange(fila, COL_NACIMIENTO).setValue(fecha), 'dd/mm/yyyy');
+    var edad = sheet.getRange(fila, COL_EDAD);
+    try {
+      edad.setFormula('=IFERROR(DATEDIF(C' + fila + ',TODAY(),"Y"),"")');
+    } catch (x) {
+      edad.setValue(edadHoy(fecha)); // si la columna no admite fórmulas, se guarda la edad de hoy
+    }
   }
   return fila;
 }
@@ -214,7 +223,7 @@ function columnaDeSesion(sheet, clave, etiqueta) {
     if (claveDeEncabezado(enc[c - 1]) === clave) return c;
   }
   var nueva = ultimaCol + 1;
-  sheet.getRange(1, nueva).setValue(clave + (etiqueta ? ' · ' + etiqueta : '')).setFontWeight('bold');
+  negrita(sheet.getRange(1, nueva).setValue(clave + (etiqueta ? ' · ' + etiqueta : '')));
   return nueva;
 }
 
@@ -239,7 +248,25 @@ function actualizarPromedio(sheet, fila) {
   var celda = sheet.getRange(fila, COL_PROMEDIO);
   if (!notas.length) { celda.setValue(''); return; }
   var suma = notas.reduce(function (a, b) { return a + b; }, 0);
-  celda.setValue(Math.round(suma / notas.length) / 100).setNumberFormat('0%');
+  formatear(celda.setValue(Math.round(suma / notas.length) / 100), '0%');
+}
+
+/** El formato es opcional: en una tabla de Sheets las columnas con tipo no lo dejan cambiar. */
+function formatear(rango, formato) {
+  try { rango.setNumberFormat(formato); } catch (x) {}
+  return rango;
+}
+
+function negrita(rango) {
+  try { rango.setFontWeight('bold'); } catch (x) {}
+  return rango;
+}
+
+function edadHoy(fecha) {
+  var hoy = new Date();
+  var edad = hoy.getFullYear() - fecha.getFullYear();
+  if (hoy.getMonth() < fecha.getMonth() || (hoy.getMonth() === fecha.getMonth() && hoy.getDate() < fecha.getDate())) edad--;
+  return edad;
 }
 
 function responder(obj) {
