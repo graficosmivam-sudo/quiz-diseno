@@ -4,7 +4,8 @@ App web de evaluaciones y seguimiento de capacitación del Área de Diseño Grá
 
 ## Estado
 - Producción: https://quiz-diseno.vercel.app (rama `main`, despliegue automático de Vercel en el equipo del área).
-- Etapa 1 en la rama `rediseno-kit-etapa1`: rediseño con el kit, Módulo 01 del curso de manual, práctica en pareja, vista de proyector y Apps Script v2. Se publica solo cuando Alejandro lo aprueba.
+- Etapa 1 en producción desde el 22/10/2026: rediseño con el kit, Módulo 01 del curso de manual, práctica en pareja, vista de proyector y Apps Script v2.
+- Los cambios van por PR (Vercel genera la vista previa) y se fusionan a `main` solo cuando Alejandro los aprueba.
 - **Orden de despliegue:** primero se publica el Apps Script (`apps-script/Codigo.gs`, «Nueva versión» de la misma implementación para que no cambie la URL `/exec`) y después se fusiona a `main`.
 
 ## Hoja de ruta
@@ -16,7 +17,7 @@ App web de evaluaciones y seguimiento de capacitación del Área de Diseño Grá
 
 ## Estructura
 - `index.html`, `estilos.css` y `app.js`: rutas por hash (`#/inicio`, `#/sesion/<clave>`, `#/practica/<clave>`, `#/proyector/<clave>`).
-- `contenido/*.js`: un archivo por programa o módulo que agrega a `window.CURSOS`. Claves: `S01`–`S06` (Photoshop, fijas en las columnas E–J de la hoja) y `M01-manual`… para los módulos del curso «De la marca al manual». Las prácticas en pareja usan `M01-logo`…
+- `contenido/*.js`: un archivo por programa o módulo que agrega a `window.CURSOS`. Claves: `S01`–`S06` (Photoshop, fijas en las columnas E–J de la hoja) y `M01-manual`, `M02-manual`… para los módulos del curso «De la marca al manual». Las prácticas en pareja usan `M01-logo`, `M02-radiografia`… El proyector muestra los campos con `proyectar` (ver README).
 - `apps-script/Codigo.gs`: `doPost` (acciones `quiz` y `practica`, además del formato antiguo) y `doGet` (`progreso`, `practicas`, `ping`).
 - La fecha de nacimiento se pide a propósito, porque se usa para el registro de cumpleaños. La edad la calcula la hoja.
 

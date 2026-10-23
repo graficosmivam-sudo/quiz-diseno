@@ -1,6 +1,6 @@
 /* Curso «De la marca al manual» · Módulo 01: ¿Qué es una identidad?
-   Para agregar el Módulo 02, copia este archivo como manual-m02.js, cambia la clave (M02-manual)
-   y agrégalo en index.html debajo de este. */
+   Para agregar un módulo, copia este archivo como manual-m0X.js, cambia la clave (M0X-manual)
+   y agrégalo en index.html debajo de los demás. */
 window.CURSOS = window.CURSOS || [];
 (function () {
   var curso = window.CURSOS.find(function (c) { return c.id === "manual"; });
@@ -102,15 +102,15 @@ window.CURSOS = window.CURSOS || [];
       titulo: "Test del logo tapado",
       instrucciones: "En pareja, elijan una marca conocida (bebida, comida, app o tienda; no de iglesias o ministerios) y descubran las reglas que sigue sin que nadie las vea escritas.",
       campos: [
-        { id: "marca", label: "Marca elegida", tipo: "texto" },
+        { id: "marca", label: "Marca elegida", tipo: "texto", proyectar: true },
         { id: "aplicaciones", label: "Paso 1 · Cinco aplicaciones (tipo de pieza y dónde la vieron)", tipo: "lista", filas: 5, ayuda: "Ej.: post de Instagram · cuenta oficial" },
         { id: "colores", label: "Paso 2 · Colores", tipo: "observacion" },
         { id: "tipografia", label: "Paso 2 · Tipografía", tipo: "observacion" },
         { id: "imagenes", label: "Paso 2 · Imágenes o fotografía", tipo: "observacion" },
         { id: "elementos", label: "Paso 2 · Elementos gráficos", tipo: "observacion" },
         { id: "tono", label: "Paso 2 · Tono de los textos", tipo: "observacion" },
-        { id: "tapado", label: "Paso 3 · Con el logo tapado, ¿se reconoce? ¿Por qué?", tipo: "parrafo" },
-        { id: "regla", label: "Paso 4 · Una regla que seguro está en su manual", tipo: "parrafo", ayuda: "Concreta, medible y justificada." }
+        { id: "tapado", label: "Paso 3 · Con el logo tapado, ¿se reconoce? ¿Por qué?", tipo: "parrafo", proyectar: "Con el logo tapado" },
+        { id: "regla", label: "Paso 4 · Una regla que seguro está en su manual", tipo: "parrafo", ayuda: "Concreta, medible y justificada.", proyectar: "Su regla" }
       ]
     }
   });
