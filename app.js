@@ -643,7 +643,8 @@
       api("practica", { activityKey: key, pareja: compa.value.trim(), fields: fields }).then(function () {
         quitar(borradorClave);
         vaciar(estado);
-        estado.appendChild(h("p", { class: "aviso aviso--ok", role: "status", text: "¡Práctica enviada! Ya aparece en el proyector para la puesta en común." }));
+        estado.appendChild(h("p", { class: "aviso aviso--ok", role: "status", text: "¡Práctica enviada! El líder la mostrará en pantalla durante la puesta en común." }));
+        if (cuenta.admin) estado.appendChild(h("a", { class: "btn btn--secundario btn--chico", href: "#/proyector/" + encodeURIComponent(key) }, "Abrir el proyector"));
         boton.textContent = "Enviada";
       }).catch(function (err) {
         boton.disabled = false;
