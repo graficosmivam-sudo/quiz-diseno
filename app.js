@@ -334,6 +334,7 @@
         h("span", { class: "ayuda", text: "Para avisarte de las sesiones y de tu avance." })),
       h("label", { class: "casilla", for: "reg-acepta" }, acepta,
         h("span", { text: "Acepto que el Área de Diseño Gráfico MIVAM guarde estos datos para la capacitación. Solo los ve el liderazgo del área y no se comparten." })),
+      h("a", { class: "enlace", href: "privacidad.html", target: "_blank", rel: "noopener" }, "Lee la política de privacidad"),
       error,
       boton,
       h("button", { class: "enlace", type: "button", onclick: salir }, "Usar otra cuenta de Google")

@@ -117,6 +117,8 @@ html = html.replace(/<!-- Contenido:[^>]*-->\s*\n\s*/, "");
 html = html.replace('src="app.js"', 'src="app.js?v=' + huella(archivos["app.js"]) + '"')
   .replace('href="estilos.css"', 'href="estilos.css?v=' + huella(archivos["estilos.css"]) + '"');
 fs.writeFileSync(path.join(SALIDA, "index.html"), html);
+fs.writeFileSync(path.join(SALIDA, "privacidad.html"),
+  leerArchivo("privacidad.html").replace('href="estilos.css"', 'href="estilos.css?v=' + huella(archivos["estilos.css"]) + '"'));
 
 fs.cpSync(path.join(RAIZ, "assets"), path.join(SALIDA, "assets"), { recursive: true });
 fs.writeFileSync(CLAVES_GS, clavesGs);
