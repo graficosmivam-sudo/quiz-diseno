@@ -6,19 +6,23 @@ App web de evaluaciones y seguimiento de capacitación del Área de Diseño Grá
 - Producción: https://quiz-diseno.vercel.app (rama `main`, despliegue automático de Vercel en el equipo del área).
 - Etapa 1 en producción desde el 22/10/2026: rediseño con el kit, Módulo 01 del curso de manual, práctica en pareja, vista de proyector y Apps Script v2.
 - Los cambios van por PR (Vercel genera la vista previa) y se fusionan a `main` solo cuando Alejandro los aprueba.
-- **Orden de despliegue:** primero se publica el Apps Script (`apps-script/Codigo.gs`, «Nueva versión» de la misma implementación para que no cambie la URL `/exec`) y después se fusiona a `main`.
+- **Orden de despliegue:** primero se publica el Apps Script (`apps-script/Codigo.gs` y `apps-script/Claves.gs`, «Nueva versión» de la misma implementación para que no cambie la URL `/exec`) y después se fusiona a `main`.
+- Seguridad (v3): acceso con cuenta de Google (Google Identity Services). El Apps Script verifica el ID token y corrige en el servidor. Las respuestas nunca se publican. Detalle y configuración en `seguridad/README.md`.
 
 ## Hoja de ruta
 1. Etapa 1 (hecha): sitio estático sin dependencias. El registro va a Google Sheets por Apps Script.
-2. Etapa 2: Firebase con la cuenta de Google del área. Acceso con cuenta de Google (todos tienen) y modo competitivo en vivo tipo Kahoot: QR o código, cronómetro, puntos por acierto y rapidez, tabla de posiciones y podio con caritas. La corrección pasa al servidor para que las respuestas no queden en el cliente. La hoja de Excel se mantiene como reporte.
+   - Adelantado de la Etapa 2: acceso con Google, registro de aspirantes (pestaña «Registro»), corrección en el servidor (Apps Script), cabeceras de seguridad y guía del cortafuegos de Vercel.
+2. Etapa 2: Firebase con la cuenta de Google del área. Modo competitivo en vivo tipo Kahoot: QR o código, cronómetro, puntos por acierto y rapidez, tabla de posiciones y podio con caritas. La corrección pasa a Cloud Functions. La hoja de Excel se mantiene como reporte.
 3. Etapa 3: tablero de seguimiento tipo Trello centrado en capacitación (Pendiente → En progreso → En revisión → Aprobado; tareas creadas por plantilla de módulo). Crean y aprueban tareas el líder y los miembros fijos. Incluye un panel del líder con el avance por fase y el criterio para pasar de fase.
 4. Etapa 4: editor de quizzes dentro de la app.
 - No duplicar el cronograma de servicios de Multimedia: es otro proyecto.
 
 ## Estructura
+- `herramientas/construir.js` (Node, sin dependencias) crea `publico/` (lo que publica Vercel, con `cursos.js` sin respuestas) y `apps-script/Claves.gs`. `publico/` no se versiona; `Claves.gs` sí.
 - `index.html`, `estilos.css` y `app.js`: rutas por hash (`#/inicio`, `#/sesion/<clave>`, `#/practica/<clave>`, `#/proyector/<clave>`).
 - `contenido/*.js`: un archivo por programa o módulo que agrega a `window.CURSOS`. Claves: `S01`–`S06` (Photoshop, fijas en las columnas E–J de la hoja) y `M01-manual`, `M02-manual`… para los módulos del curso «De la marca al manual». Las prácticas en pareja usan `M01-logo`, `M02-radiografia`… El proyector muestra los campos con `proyectar` (ver README).
-- `apps-script/Codigo.gs`: `doPost` (acciones `quiz` y `practica`, además del formato antiguo) y `doGet` (`progreso`, `practicas`, `ping`).
+- `apps-script/Codigo.gs`: todo entra por `doPost` con `token` (acciones `yo`, `registro`, `quiz`, `practica`, `practicas`). `doGet` solo hace ping. Propiedades del script: `CLIENT_ID` y `ADMINS`.
+- La CSP de `vercel.json` no admite estilos en línea por atributo: usa clases (sí se puede `el.style.x = …`). Un servicio externo nuevo se agrega a la CSP.
 - La fecha de nacimiento se pide a propósito, porque se usa para el registro de cumpleaños. La edad la calcula la hoja.
 
 ## Identidad (Kit de Identidad v1.2 · uso interno del área)
@@ -32,6 +36,6 @@ App web de evaluaciones y seguimiento de capacitación del Área de Diseño Grá
 - Sistema de diseño completo en Claude Design: «Diseño Gráfico MIVAM».
 
 ## Cómo probar
-- `python3 -m http.server` en la raíz y abrir `http://localhost:8000`.
-- Para probar sin tocar la hoja real, interceptar `script.google.com` (por ejemplo con Playwright).
+- `node herramientas/construir.js && python3 -m http.server -d publico` y abrir `http://localhost:8000`.
+- Para probar sin tocar la hoja real, interceptar `script.google.com` y `accounts.google.com/gsi/client` (por ejemplo con Playwright, con un Google Identity falso que entregue un token de prueba).
 - Revisar a 390 px de ancho (sin desplazamiento horizontal) y en escritorio.

@@ -1,35 +1,148 @@
-/* Capacitación · Diseño Gráfico MIVAM — app de evaluaciones (etapa 1).
-   Sin dependencias. El contenido vive en /contenido/*.js; los resultados se envían
-   a la hoja de Google mediante Apps Script (ver /apps-script/Codigo.gs). */
+/* Capacitación · Diseño Gráfico MIVAM — app de evaluaciones.
+   Sin dependencias. El contenido vive en /contenido/*.js y herramientas/construir.js lo publica sin
+   las respuestas: la corrección la hace el Apps Script (ver /apps-script/Codigo.gs).
+   El acceso es con cuenta de Google: cada petición lleva el token de Google de quien la hace. */
 (function () {
   "use strict";
 
   // ==========================================
-  // CONFIGURACIÓN: ENLACE DE GOOGLE APPS SCRIPT
+  // CONFIGURACIÓN
   // ==========================================
   var GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbymxEza1msJmXFQpm4_wxw0LCVmJriMO7HcVTYXrt5PXCSgo1YdZHFCFnjgMQwlr3A2Fw/exec";
+  // ID de cliente OAuth («Aplicación web») de Google Cloud. No es secreto. Ver seguridad/README.md.
+  var GOOGLE_CLIENT_ID = "250612702128-jo3n072cb0becb5duflflc363lebemgv.apps.googleusercontent.com";
 
   var CURSOS = window.CURSOS || [];
   var raiz = document.getElementById("app");
   var barraUsuario = document.getElementById("barra-usuario");
 
-  /* ---------- Almacenamiento local (con tolerancia a errores) ---------- */
-  function leer(clave, porDefecto) {
-    try { var v = localStorage.getItem(clave); return v ? JSON.parse(v) : porDefecto; } catch (e) { return porDefecto; }
+  /* ---------- Almacenamiento (con tolerancia a errores) ---------- */
+  function leer(clave, porDefecto, almacen) {
+    try { var v = (almacen || localStorage).getItem(clave); return v ? JSON.parse(v) : porDefecto; } catch (e) { return porDefecto; }
   }
-  function guardar(clave, valor) {
-    try { localStorage.setItem(clave, JSON.stringify(valor)); } catch (e) { /* sin almacenamiento */ }
+  function guardar(clave, valor, almacen) {
+    try { (almacen || localStorage).setItem(clave, JSON.stringify(valor)); } catch (e) { /* sin almacenamiento */ }
   }
-  function quitar(clave) { try { localStorage.removeItem(clave); } catch (e) {} }
+  function quitar(clave, almacen) { try { (almacen || localStorage).removeItem(clave); } catch (e) {} }
+  function sesionStorage() { try { return window.sessionStorage; } catch (e) { return null; } }
 
-  function normalizar(t) {
-    return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  /* ---------- Sesión con Google ----------
+     El token solo vive en esta pestaña (sessionStorage) y dura una hora. Al volver, Google vuelve a
+     entrar solo si la persona ya eligió su cuenta antes («auto_select»). */
+  var sesion = leer("mivam_sesion", null, sesionStorage());
+  var cuenta = null;         // respuesta de «yo»: { registrado, admin, perfil, sesiones }
+  var esperandoToken = [];   // promesas que esperan un token nuevo
+  var googleListo = null;
+
+  function decodificarToken(token) { // solo para mostrar datos y saber cuándo vence: quien verifica es el servidor
+    try {
+      var p = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      return JSON.parse(decodeURIComponent(escape(atob(p))));
+    } catch (e) { return null; }
   }
-  function persona() { return leer("mivam_persona", null); }
-  function claveProgreso() { var p = persona(); return "mivam_progreso_" + normalizar(p ? p.nombre : ""); }
-  function progreso() { return leer(claveProgreso(), {}); }
-  function guardarProgreso(pr) { guardar(claveProgreso(), pr); }
-  function notasRemotas() { return leer(claveProgreso() + "_remoto", {}); }
+  function sesionVigente() { return !!(sesion && sesion.exp * 1000 > Date.now() + 60000); }
+  function correo() { return sesion ? sesion.correo : ""; }
+
+  function cargarGoogle() {
+    if (googleListo) return googleListo;
+    googleListo = new Promise(function (resolver, rechazar) {
+      var intentos = 0;
+      (function esperar() {
+        if (window.google && google.accounts && google.accounts.id) {
+          google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: alRecibirCredencial,
+            auto_select: true,
+            cancel_on_tap_outside: false,
+            use_fedcm_for_prompt: true,
+            context: "signin"
+          });
+          return resolver();
+        }
+        if (++intentos > 100) { googleListo = null; return rechazar(new Error("No cargó el acceso de Google")); }
+        setTimeout(esperar, 100);
+      })();
+    });
+    return googleListo;
+  }
+
+  function alRecibirCredencial(respuesta) {
+    var datos = decodificarToken(respuesta && respuesta.credential);
+    if (!datos || !datos.email) return;
+    var cambioDeCuenta = correo() && correo() !== String(datos.email).toLowerCase();
+    sesion = { token: respuesta.credential, exp: datos.exp, correo: String(datos.email).toLowerCase(), nombreGoogle: datos.name || "" };
+    guardar("mivam_sesion", sesion, sesionStorage());
+    if (cambioDeCuenta) cuenta = null;
+    var pendientes = esperandoToken; esperandoToken = [];
+    pendientes.forEach(function (p) { p.resolver(); });
+    if (!pendientes.length) {
+      var volver = leer("mivam_volver", null, sesionStorage());
+      quitar("mivam_volver", sesionStorage());
+      if (volver && volver !== location.hash) location.hash = volver; else render();
+    }
+  }
+
+  /** Pide a Google un token nuevo sin interrumpir (sirve cuando vence a la hora). */
+  function renovarToken() {
+    return cargarGoogle().then(function () {
+      return new Promise(function (resolver, rechazar) {
+        var item = { resolver: resolver };
+        esperandoToken.push(item);
+        google.accounts.id.prompt();
+        setTimeout(function () {
+          if (esperandoToken.indexOf(item) === -1) return;
+          esperandoToken.splice(esperandoToken.indexOf(item), 1);
+          rechazar(errorSesion());
+        }, 20000);
+      });
+    });
+  }
+  function errorSesion() { var e = new Error("Tu sesión venció. Vuelve a entrar con Google."); e.codigo = "sesion"; return e; }
+
+  function cerrarSesion(guardarVuelta) {
+    if (guardarVuelta) guardar("mivam_volver", location.hash, sesionStorage());
+    sesion = null;
+    cuenta = null;
+    quitar("mivam_sesion", sesionStorage());
+  }
+
+  /* ---------- Llamadas al registro ----------
+     POST con cuerpo de texto: así el navegador no hace la consulta previa (CORS) que Apps Script no responde. */
+  function api(accion, datos) {
+    var listo = sesionVigente() ? Promise.resolve() : renovarToken();
+    return listo.then(function () {
+      var cuerpo = Object.assign({ action: accion, token: sesion.token }, datos || {});
+      return fetch(GOOGLE_SCRIPT_URL, { method: "POST", body: JSON.stringify(cuerpo), redirect: "follow", credentials: "omit" });
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (res) {
+      if (res && (res.status === "ok" || res.status === "success")) return res;
+      var e = new Error((res && res.message) || "Respuesta inesperada del registro.");
+      e.codigo = res && res.codigo;
+      throw e;
+    }).catch(function (e) {
+      if (e.codigo === "sesion") { cerrarSesion(true); render(); }
+      throw e;
+    });
+  }
+
+  /* ---------- Datos locales de la cuenta (solo como apoyo; la fuente es la hoja) ---------- */
+  function claveLocal(nombre) { return "mivam_" + nombre + "_" + correo(); }
+  function resultados() { return leer(claveLocal("resultados"), {}); }
+  function guardarResultado(key, r) { var todo = resultados(); todo[key] = r; guardar(claveLocal("resultados"), todo); }
+
+  function limpiarDatosLocales() {
+    try {
+      Object.keys(localStorage).forEach(function (k) {
+        if (/^mivam_/.test(k) || k === "current_applicant" || k === "quiz_db") localStorage.removeItem(k);
+      });
+    } catch (e) {}
+  }
+  function migrarVersionAnterior() {
+    // Las versiones sin cuenta guardaban nombre, nacimiento y notas en el dispositivo. Ya no se usan.
+    if (leer("mivam_persona", null) || leer("current_applicant", null)) limpiarDatosLocales();
+  }
 
   /* ---------- Utilidades de DOM ---------- */
   function h(tag, attrs) {
@@ -56,6 +169,12 @@
     return ((partes[0] || "")[0] || "") + ((partes[1] || "")[0] || "");
   }
   function dosDigitos(n) { return String(n).padStart(2, "0"); }
+  function contenedor() { var c = h("div", { class: "contenedor" }); agregar(c, Array.prototype.slice.call(arguments)); return c; }
+  function cargando(texto) {
+    vaciar(raiz);
+    raiz.appendChild(contenedor(h("div", { class: "envio" },
+      h("span", { class: "cargando", "aria-hidden": "true" }), h("p", { class: "texto-apoyo", text: texto }))));
+  }
 
   function buscarSesion(key) {
     for (var i = 0; i < CURSOS.length; i++) {
@@ -74,154 +193,173 @@
     return null;
   }
 
-  /* ---------- Envío a la hoja: confirmado, con cola de reintentos ---------- */
-  function enviar(payload) {
-    return fetch(GOOGLE_SCRIPT_URL, { method: "POST", body: JSON.stringify(payload), redirect: "follow" })
-      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-      .then(function (res) { if (!res || res.status !== "success") throw new Error((res && res.message) || "Respuesta inesperada"); return res; });
-  }
-  function encolar(item) {
-    var cola = leer("mivam_pendientes", []);
-    cola = cola.filter(function (x) { return x.id !== item.id; });
-    cola.push(item);
-    guardar("mivam_pendientes", cola);
-  }
-  function desencolar(id) {
-    guardar("mivam_pendientes", leer("mivam_pendientes", []).filter(function (x) { return x.id !== id; }));
-  }
-  function reintentarPendientes() {
-    var cola = leer("mivam_pendientes", []);
-    if (!cola.length || !navigator.onLine) return Promise.resolve();
-    return cola.reduce(function (p, item) {
-      return p.then(function () {
-        return enviar(item.payload).then(function () {
-          desencolar(item.id);
-          marcarEnviado(item);
-        }).catch(function () { /* queda en cola */ });
-      });
-    }, Promise.resolve());
-  }
-  function marcarEnviado(item) {
-    if (item.tipo !== "quiz") return;
-    var claveP = "mivam_progreso_" + normalizar(item.payload.name);
-    var pr = leer(claveP, {});
-    if (pr[item.payload.sessionKey]) { pr[item.payload.sessionKey].enviado = true; guardar(claveP, pr); }
-  }
-  window.addEventListener("online", function () { reintentarPendientes().then(render); });
-
-  function traerProgresoRemoto() {
-    var p = persona();
-    if (!p || !navigator.onLine) return Promise.resolve();
-    var url = GOOGLE_SCRIPT_URL + "?action=progreso&nombre=" + encodeURIComponent(p.nombre);
-    return fetch(url).then(function (r) { return r.json(); }).then(function (res) {
-      if (res && res.status === "ok" && res.sesiones) guardar(claveProgreso() + "_remoto", res.sesiones);
-    }).catch(function () { /* sin conexión: se usa lo local */ });
-  }
-
   /* ---------- Barra superior ---------- */
   function pintarBarra() {
     vaciar(barraUsuario);
-    var p = persona();
-    if (!p) return;
+    if (!cuenta || !cuenta.registrado) return;
     barraUsuario.appendChild(h("div", { class: "usuario" },
-      h("span", { class: "avatar", "aria-hidden": "true", text: iniciales(p.nombre) }),
-      h("span", { class: "usuario__nombre", text: p.nombre }),
+      h("span", { class: "avatar", "aria-hidden": "true", text: iniciales(cuenta.perfil.nombre) }),
+      h("span", { class: "usuario__nombre", text: cuenta.perfil.nombre }),
       h("button", { class: "btn btn--secundario btn--chico", type: "button", onclick: pedirSalida }, "Salir")
     ));
   }
   function pedirSalida() {
-    var pendientes = leer("mivam_pendientes", []).length;
     vaciar(raiz);
-    raiz.appendChild(h("div", { class: "contenedor" },
-      h("div", { class: "panel", style: "max-width:520px" },
+    raiz.appendChild(contenedor(
+      h("div", { class: "panel panel--angosto" },
         h("p", { class: "etiqueta", text: "Cerrar sesión" }),
         h("h2", { class: "display display--m", text: "¿Salir?" }),
-        pendientes
-          ? h("p", { class: "aviso aviso--error" }, "Tienes " + pendientes + " resultado(s) sin enviar. Si sales en este dispositivo se seguirán reintentando, pero conéctate pronto.")
-          : h("p", { class: "texto-apoyo", text: "Tus resultados ya están guardados en el registro del área." }),
+        h("p", { class: "texto-apoyo", text: "Tus resultados ya están en el registro del área. Al salir se borra lo guardado en este dispositivo." }),
         h("div", { class: "acciones" },
-          h("button", { class: "btn", type: "button", onclick: function () { quitar("mivam_persona"); ir("#/"); } }, "Sí, salir"),
+          h("button", { class: "btn", type: "button", onclick: salir }, "Sí, salir"),
           h("button", { class: "btn btn--secundario", type: "button", onclick: render }, "Cancelar")
         )
       )
     ));
+  }
+  function salir() {
+    limpiarDatosLocales();
+    cerrarSesion(false);
+    if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect();
+    ir("#/inicio");
   }
 
   /* ---------- Rutas ---------- */
   function ir(hash) { if (location.hash === hash) render(); else location.hash = hash; }
   window.addEventListener("hashchange", render);
 
+  var temporizador = null;
   function render() {
+    clearInterval(temporizador);
     var ruta = location.hash.replace(/^#\/?/, "").split("/");
     document.body.classList.toggle("proyector", ruta[0] === "proyector");
     window.scrollTo(0, 0);
-    if (ruta[0] === "proyector" && ruta[1]) return vistaProyector(decodeURIComponent(ruta[1]));
     pintarBarra();
-    if (!persona()) return vistaIngreso();
+    if (!GOOGLE_CLIENT_ID) return vistaSinConfigurar();
+    if (!sesionVigente()) return vistaIngreso();
+    if (!cuenta) return cargarCuenta();
+    if (!cuenta.registrado) return vistaRegistro();
+    if (ruta[0] === "proyector" && ruta[1]) return vistaProyector(decodeURIComponent(ruta[1]));
     if (ruta[0] === "sesion" && ruta[1]) return vistaSesion(decodeURIComponent(ruta[1]));
     if (ruta[0] === "practica" && ruta[1]) return vistaPractica(decodeURIComponent(ruta[1]));
     return vistaInicio();
   }
 
+  function cargarCuenta() {
+    cargando("Cargando tu registro…");
+    api("yo").then(function (res) { cuenta = res; render(); }).catch(function (e) {
+      if (e.codigo === "sesion") return;
+      vaciar(raiz);
+      raiz.appendChild(contenedor(h("div", { class: "panel panel--angosto" },
+        h("p", { class: "aviso aviso--error", role: "alert", text: "No se pudo conectar con el registro del área. " + e.message }),
+        h("button", { class: "btn", type: "button", onclick: render }, "Reintentar"))));
+    });
+  }
+
   /* ---------- Vista: ingreso ---------- */
+  function encabezadoIngreso() {
+    return h("div", { class: "ingreso__titular" },
+      h("p", { class: "etiqueta", text: "Área de Diseño Gráfico MIVAM" }),
+      h("h1", { class: "display display--xl", text: "Capacitación" }),
+      h("p", { class: "ingreso__bajada", text: "Evaluaciones y prácticas del programa de formación del área." })
+    );
+  }
+  function fotoEquipo() {
+    return h("div", { class: "ingreso__intro" },
+      h("img", { src: "assets/img/equipo-caritas.jpg", alt: "Las caritas del equipo de diseño", width: "1600", height: "346" }));
+  }
+
   function vistaIngreso() {
     vaciar(raiz);
+    var boton = h("div", { class: "boton-google" });
+    var estado = h("p", { class: "texto-apoyo", text: "Cargando el acceso de Google…" });
+    raiz.appendChild(contenedor(encabezadoIngreso(),
+      h("div", { class: "ingreso" }, fotoEquipo(),
+        h("div", { class: "panel" },
+          h("p", { class: "etiqueta", text: "Ingreso" }),
+          h("h2", { class: "ingreso__subtitulo", text: "Entra con tu cuenta de Google" }),
+          h("p", { class: "texto-apoyo", text: "Así tus notas quedan unidas a ti y nadie más puede verlas ni cambiarlas. Solo usamos tu nombre y tu correo." }),
+          boton, estado
+        ))
+    ));
+    cargarGoogle().then(function () {
+      estado.hidden = true;
+      google.accounts.id.renderButton(boton, { type: "standard", theme: "outline", size: "large", text: "continue_with", shape: "pill", locale: "es", width: 280 });
+      google.accounts.id.prompt();
+    }).catch(function () {
+      estado.className = "aviso aviso--error";
+      estado.textContent = "No se pudo cargar el acceso de Google. Revisa la conexión o desactiva el bloqueador de anuncios para este sitio y recarga la página.";
+    });
+  }
+
+  function vistaSinConfigurar() {
+    vaciar(raiz);
+    raiz.appendChild(contenedor(encabezadoIngreso(), h("div", { class: "panel panel--angosto" },
+      h("p", { class: "aviso aviso--info", text: "Falta configurar el acceso con Google (GOOGLE_CLIENT_ID en app.js). Ver seguridad/README.md." }))));
+  }
+
+  /* ---------- Vista: registro (primera vez) ---------- */
+  function vistaRegistro() {
+    vaciar(raiz);
     var error = h("p", { class: "aviso aviso--error", hidden: true, role: "alert" });
-    var nombre = h("input", { class: "control", id: "ing-nombre", type: "text", autocomplete: "name", placeholder: "Ej.: Alejandro Marcano", required: true });
-    var nac = h("input", { class: "control", id: "ing-nacimiento", type: "date", required: true });
+    var nombre = h("input", { class: "control", id: "reg-nombre", type: "text", autocomplete: "name", maxlength: "80", placeholder: "Ej.: Alejandro Marcano", required: true });
+    nombre.value = cuenta.nombreGoogle || "";
+    var nac = h("input", { class: "control", id: "reg-nacimiento", type: "date", required: true });
+    var tel = h("input", { class: "control", id: "reg-telefono", type: "tel", autocomplete: "tel", maxlength: "20", placeholder: "+58 412 123 4567", required: true });
+    var acepta = h("input", { id: "reg-acepta", type: "checkbox", required: true });
+    var boton = h("button", { class: "btn btn--bloque", type: "submit" }, "Completar registro");
+
+    function mostrarError(texto, foco) { error.textContent = texto; error.hidden = false; if (foco) foco.focus(); }
     var form = h("form", { class: "panel", novalidate: true, onsubmit: function (e) {
         e.preventDefault();
         var n = nombre.value.replace(/\s+/g, " ").trim();
-        if (n.split(" ").length < 2) { error.textContent = "Escribe tu nombre y tu apellido."; error.hidden = false; nombre.focus(); return; }
-        if (!nac.value) { error.textContent = "Indica tu fecha de nacimiento."; error.hidden = false; nac.focus(); return; }
-        guardar("mivam_persona", { nombre: n, nacimiento: nac.value });
-        ir("#/inicio");
-        traerProgresoRemoto().then(function () { if (location.hash === "#/inicio") render(); });
+        if (n.split(" ").length < 2) return mostrarError("Escribe tu nombre y tu apellido.", nombre);
+        if (!nac.value) return mostrarError("Indica tu fecha de nacimiento.", nac);
+        if (!/^\+?[0-9][0-9 ().-]{6,19}$/.test(tel.value.trim())) return mostrarError("Escribe un teléfono válido, con el código del país.", tel);
+        if (!acepta.checked) return mostrarError("Para registrarte debes aceptar el uso de tus datos.", acepta);
+        error.hidden = true;
+        boton.disabled = true;
+        boton.textContent = "Guardando…";
+        api("registro", { nombre: n, nacimiento: nac.value, telefono: tel.value.trim(), acepta: true })
+          .then(function (res) { cuenta = res; ir("#/inicio"); })
+          .catch(function (err) { boton.disabled = false; boton.textContent = "Completar registro"; mostrarError(err.message); });
       } },
-      h("p", { class: "etiqueta", text: "Ingreso" }),
-      h("h2", { style: "font-size:22px;font-weight:700", text: "Entra a tus evaluaciones" }),
-      h("p", { class: "texto-apoyo", text: "Escribe tus datos igual que la primera vez: así tus notas se unen en el registro del área." }),
-      h("div", { class: "campo" }, h("label", { for: "ing-nombre", text: "Nombre y apellido" }), nombre),
-      h("div", { class: "campo" }, h("label", { for: "ing-nacimiento", text: "Fecha de nacimiento" }), nac,
+      h("p", { class: "etiqueta", text: "Registro" }),
+      h("h2", { class: "ingreso__subtitulo", text: "Completa tu registro" }),
+      h("p", { class: "texto-apoyo" }, "Entraste como ", h("strong", { text: correo() }), ". Si ya hiciste evaluaciones antes, escribe tu nombre igual que entonces: así se unen tus notas."),
+      h("div", { class: "campo" }, h("label", { for: "reg-nombre", text: "Nombre y apellido" }), nombre),
+      h("div", { class: "campo" }, h("label", { for: "reg-nacimiento", text: "Fecha de nacimiento" }), nac,
         h("span", { class: "ayuda", text: "La usamos para el registro de cumpleaños del área." })),
+      h("div", { class: "campo" }, h("label", { for: "reg-telefono", text: "Teléfono (WhatsApp)" }), tel,
+        h("span", { class: "ayuda", text: "Para avisarte de las sesiones y de tu avance." })),
+      h("label", { class: "casilla", for: "reg-acepta" }, acepta,
+        h("span", { text: "Acepto que el Área de Diseño Gráfico MIVAM guarde estos datos para la capacitación. Solo los ve el liderazgo del área y no se comparten." })),
+      h("a", { class: "enlace", href: "privacidad.html", target: "_blank", rel: "noopener" }, "Lee la política de privacidad"),
       error,
-      h("button", { class: "btn btn--bloque", type: "submit" }, "Entrar")
+      boton,
+      h("button", { class: "enlace", type: "button", onclick: salir }, "Usar otra cuenta de Google")
     );
-    raiz.appendChild(h("div", { class: "contenedor" },
-      h("div", { class: "ingreso__titular" },
-        h("p", { class: "etiqueta", text: "Área de Diseño Gráfico MIVAM" }),
-        h("h1", { class: "display display--xl", text: "Capacitación" }),
-        h("p", { style: "font-size:18px;max-width:40ch", text: "Evaluaciones y prácticas del programa de formación del área." })
-      ),
-      h("div", { class: "ingreso" },
-        h("div", { class: "ingreso__intro" },
-          h("img", { src: "assets/img/equipo-caritas.jpg", alt: "Las caritas del equipo de diseño", width: "1600", height: "346" })
-        ),
-        form
-      )
-    ));
+    raiz.appendChild(contenedor(encabezadoIngreso(), h("div", { class: "ingreso" }, fotoEquipo(), form)));
   }
 
   /* ---------- Vista: inicio ---------- */
+  function notaDe(key) {
+    if (cuenta.sesiones && cuenta.sesiones[key] !== undefined) return cuenta.sesiones[key];
+    return null;
+  }
+
   function vistaInicio() {
     vaciar(raiz);
-    var p = persona();
-    var pr = progreso();
-    var remoto = notasRemotas();
-    var pendientes = leer("mivam_pendientes", []).length;
-    var cont = h("div", { class: "contenedor" },
+    var cont = contenedor(
       h("div", { class: "saludo" },
         h("p", { class: "etiqueta", text: "Tus evaluaciones" }),
-        h("h1", { class: "display display--l", text: "Hola, " + p.nombre.split(" ")[0] }),
-        pendientes ? h("p", { class: "aviso aviso--error" }, pendientes + " resultado(s) pendientes de envío. ",
-          h("button", { class: "enlace", type: "button", onclick: function () { reintentarPendientes().then(render); } }, "Reintentar ahora")) : null
+        h("h1", { class: "display display--l", text: "Hola, " + cuenta.perfil.nombre.split(" ")[0] })
       )
     );
     CURSOS.forEach(function (curso) {
       var rejilla = h("div", { class: "rejilla" });
       curso.sesiones.forEach(function (s) {
-        var local = pr[s.key];
-        var nota = local ? local.score.pct : (remoto[s.key] !== undefined ? remoto[s.key] : null);
+        var nota = notaDe(s.key);
         rejilla.appendChild(h("button", { class: "tarjeta", type: "button", onclick: function () { ir("#/sesion/" + encodeURIComponent(s.key)); } },
           h("p", { class: "etiqueta", text: s.etiqueta + " · " + s.mode }),
           h("span", { class: "tarjeta__titulo", text: s.title }),
@@ -250,18 +388,20 @@
     var hallado = buscarSesion(key);
     if (!hallado) return ir("#/inicio");
     var s = hallado.sesion;
-    var pr = progreso();
-    var previo = pr[key];
-    var notaRemota = notasRemotas()[key];
-    var modoRepaso = !previo && notaRemota !== undefined;
-    var respuestas = previo ? Object.assign({}, previo.answers) : {};
+    var notaRegistrada = notaDe(key);
+    var previo = resultados()[key] || null;       // corrección que devolvió el servidor en este dispositivo
+    if (previo && previo.registrado && notaRegistrada === null) previo = null; // el líder borró la nota: se puede repetir
+    var borradorClave = claveLocal("borrador_" + key);
+    var respuestas = previo ? Object.assign({}, previo.answers) : leer(borradorClave, {});
     var evaluada = !!previo;
+    var modoRepaso = previo ? !previo.registrado : notaRegistrada !== null;
 
     vaciar(raiz);
     var relleno = h("div", { class: "progreso__relleno" });
     var textoProg = h("span", { class: "progreso__texto" });
     var lista = h("div", { class: "preguntas" });
     var botonEvaluar = h("button", { class: "btn btn--bloque", type: "button", disabled: true, onclick: evaluar }, "Evaluar " + s.etiqueta.toLowerCase());
+    var estadoEnvio = h("div", { class: "envio" });
     var zonaResultado = h("div");
 
     function actualizarProgreso() {
@@ -273,7 +413,9 @@
 
     function pintarPreguntas() {
       vaciar(lista);
+      var detalle = previo ? previo.detalle : {};
       s.questions.forEach(function (q, i) {
+        var d = detalle[q.id];
         var opciones = q.type === "vf"
           ? [{ key: true, letra: "V", text: "Verdadero" }, { key: false, letra: "F", text: "Falso" }]
           : q.options.map(function (o) { return { key: o.key, letra: o.key, text: o.text }; });
@@ -282,14 +424,15 @@
           var elegida = respuestas[q.id] === o.key;
           var clase = "opcion";
           var estado = null;
-          if (evaluada) {
-            if (o.key === q.answer) { clase += " opcion--correcta"; estado = "Correcta"; }
+          if (evaluada && d) {
+            if (o.key === d.correcta) { clase += " opcion--correcta"; estado = "Correcta"; }
             else if (elegida) { clase += " opcion--incorrecta"; estado = "Tu respuesta"; }
           } else if (elegida) clase += " opcion--seleccionada";
           var idBoton = "o-" + q.id + "-" + o.letra;
           cont.appendChild(h("button", { class: clase, id: idBoton, type: "button", disabled: evaluada, "aria-pressed": elegida ? "true" : "false",
               onclick: function () {
                 respuestas[q.id] = o.key;
+                guardar(borradorClave, respuestas);
                 pintarPreguntas();
                 actualizarProgreso();
                 var b = document.getElementById(idBoton); // conserva el foco del teclado tras repintar
@@ -300,7 +443,6 @@
             estado ? h("span", { class: "opcion__estado", text: estado }) : null
           ));
         });
-        var acierto = respuestas[q.id] === q.answer;
         lista.appendChild(h("article", { class: "pregunta", id: "p-" + q.id },
           h("div", { class: "pregunta__tipo" },
             h("span", { class: "pregunta__numero", text: dosDigitos(i + 1) }),
@@ -309,111 +451,94 @@
           q.type === "case" ? h("p", { class: "caso", text: q.caseText }) : null,
           h("p", { class: "pregunta__texto", text: q.text }),
           cont,
-          evaluada ? h("p", { class: "retro " + (acierto ? "retro--correcto" : "retro--error") },
-            h("strong", { text: acierto ? "Correcto" : "Incorrecto" }), acierto ? q.feedbackCorrect : q.feedbackWrong) : null
+          evaluada && d ? h("p", { class: "retro " + (d.acierto ? "retro--correcto" : "retro--error") },
+            h("strong", { text: d.acierto ? "Correcto" : "Incorrecto" }), d.retro) : null
         ));
       });
     }
 
-    function evaluar() {
-      var correctas = s.questions.filter(function (q) { return respuestas[q.id] === q.answer; }).length;
-      var pct = Math.round(correctas / s.questions.length * 100);
-      evaluada = true;
-      if (!modoRepaso) {
-        pr = progreso();
-        pr[key] = { score: { correct: correctas, total: s.questions.length, pct: pct }, answers: respuestas, enviado: false, fecha: new Date().toISOString() };
-        guardarProgreso(pr);
-      }
-      pintarPreguntas();
-      actualizarProgreso();
-      pintarResultado(correctas, pct);
-      zonaResultado.scrollIntoView({ behavior: "smooth", block: "start" });
-      if (!modoRepaso) enviarResultado(correctas, pct);
-    }
-
-    var estadoEnvio = h("div", { class: "envio" });
-    function pintarEstado(tipo, texto, reintento, detalle) {
+    function pintarEstado(tipo, texto, reintento) {
       vaciar(estadoEnvio);
       if (tipo === "enviando") estadoEnvio.appendChild(h("span", { class: "cargando", "aria-hidden": "true" }));
       estadoEnvio.appendChild(h("p", { class: "aviso " + (tipo === "ok" ? "aviso--ok" : tipo === "error" ? "aviso--error" : "aviso--info"), role: "status", text: texto }));
-      if (detalle) estadoEnvio.appendChild(h("p", { class: "texto-apoyo", text: "Detalle para el líder del área: " + detalle }));
-      if (reintento) estadoEnvio.appendChild(h("button", { class: "btn btn--secundario btn--chico", type: "button", onclick: reintento }, "Reintentar envío"));
+      if (reintento) estadoEnvio.appendChild(h("button", { class: "btn btn--secundario btn--chico", type: "button", onclick: reintento }, "Reintentar"));
     }
 
-    function enviarResultado(correctas, pct) {
-      var p = persona();
-      var item = {
-        id: normalizar(p.nombre) + "|" + key,
-        tipo: "quiz",
-        payload: { action: "quiz", name: p.nombre, dob: p.nacimiento, sessionKey: key, sessionTitle: s.title,
-          columnLabel: s.etiqueta + " · " + s.title, correct: correctas, total: s.questions.length, pct: pct, answers: respuestas }
-      };
-      encolar(item);
-      pintarEstado("enviando", "Guardando tu resultado en el registro del área…");
-      enviar(item.payload).then(function () {
-        desencolar(item.id);
-        marcarEnviado(item);
-        pintarEstado("ok", "Resultado guardado en el registro del área.");
+    function evaluar() {
+      botonEvaluar.disabled = true;
+      pintarEstado("enviando", modoRepaso ? "Corrigiendo tu repaso…" : "Corrigiendo y guardando en el registro del área…");
+      api("quiz", { sessionKey: key, answers: respuestas }).then(function (res) {
+        previo = { answers: respuestas, detalle: res.detalle, correct: res.correct, total: res.total, pct: res.pct, registrado: res.registrado };
+        guardarResultado(key, previo);
+        quitar(borradorClave);
+        if (res.registrado) cuenta.sesiones[key] = res.pct;
+        evaluada = true;
+        modoRepaso = !res.registrado;
+        notaRegistrada = res.notaRegistrada;
+        botonEvaluar.hidden = true;
+        pintarPreguntas();
+        actualizarProgreso();
+        pintarResultado();
+        zonaResultado.scrollIntoView({ behavior: "smooth", block: "start" });
       }).catch(function (err) {
-        pintarEstado("error", "No se pudo guardar todavía. Tu resultado quedó en este dispositivo y se reenviará solo al volver la conexión.", function () { enviarResultado(correctas, pct); }, err && err.message);
+        actualizarProgreso();
+        pintarEstado("error", "No se pudo corregir: " + err.message + " Tus respuestas siguen guardadas en este dispositivo.", evaluar);
       });
     }
 
-    function pintarResultado(correctas, pct) {
+    function pintarResultado() {
       vaciar(zonaResultado);
+      var correctas = previo.correct, pct = previo.pct, total = previo.total;
+      var minimo = Math.ceil(total * s.aprobar / 100);
       var nivel;
       if (s.criterio === "aprobacion") {
         nivel = pct >= s.aprobar
-          ? { titulo: "Aprobado", texto: "Superaste el mínimo de " + Math.ceil(s.questions.length * s.aprobar / 100) + " de " + s.questions.length + ". ¡Bien hecho!", clase: "pastilla--correcto", fiesta: true }
-          : { titulo: "Necesitas repasar", texto: "El mínimo es " + Math.ceil(s.questions.length * s.aprobar / 100) + " de " + s.questions.length + ". Repasa con tu diseñador de turno antes del próximo módulo.", clase: "pastilla--error", fiesta: false };
+          ? { titulo: "Aprobado", texto: "Superaste el mínimo de " + minimo + " de " + total + ". ¡Bien hecho!", clase: "pastilla--correcto", fiesta: true }
+          : { titulo: "Necesitas repasar", texto: "El mínimo es " + minimo + " de " + total + ". Repasa con tu diseñador de turno antes del próximo módulo.", clase: "pastilla--error", fiesta: false };
       } else {
         nivel = pct >= 83 ? { titulo: "Dominio sólido", texto: "Comprensión excelente del tema analizado.", clase: "pastilla--correcto", fiesta: true }
           : pct >= 50 ? { titulo: "Buen avance", texto: "Comprensión general estable, con pequeños detalles a reforzar.", clase: "pastilla--naranja", fiesta: false }
           : { titulo: "Necesita refuerzo", texto: "Se sugiere repasar los tópicos base de la sesión.", clase: "pastilla--error", fiesta: false };
       }
-      var caja = h("section", { class: "resultado", "aria-live": "polite" },
+      if (modoRepaso) pintarEstado("info", "Repaso: no cambia tu nota registrada" + (notaRegistrada !== null && notaRegistrada !== undefined ? " (" + notaRegistrada + "%)." : "."));
+      else pintarEstado("ok", "Resultado guardado en el registro del área.");
+      zonaResultado.appendChild(h("section", { class: "resultado", "aria-live": "polite" },
         nivel.fiesta ? destellos() : null,
-        h("p", { class: "etiqueta", text: modoRepaso ? "Repaso · no se envía" : "Tu resultado" }),
+        h("p", { class: "etiqueta", text: modoRepaso ? "Repaso · no se registra" : "Tu resultado" }),
         h("p", { class: "resultado__nota", text: pct + "%" }),
         h("div", { class: "pastillas" }, h("span", { class: "pastilla " + nivel.clase, text: nivel.titulo })),
         h("p", { text: nivel.texto }),
         h("div", { class: "resultado__desglose" },
           h("div", { class: "resultado__dato" }, h("b", { text: correctas }), h("span", { text: "Correctas" })),
-          h("div", { class: "resultado__dato" }, h("b", { text: s.questions.length - correctas }), h("span", { text: "Incorrectas" })),
-          h("div", { class: "resultado__dato" }, h("b", { text: s.questions.length }), h("span", { text: "Preguntas" }))
+          h("div", { class: "resultado__dato" }, h("b", { text: total - correctas }), h("span", { text: "Incorrectas" })),
+          h("div", { class: "resultado__dato" }, h("b", { text: total }), h("span", { text: "Preguntas" }))
         ),
-        modoRepaso ? null : estadoEnvio,
+        estadoEnvio,
         h("div", { class: "acciones" },
           s.practica ? h("a", { class: "btn btn--acento", href: "#/practica/" + encodeURIComponent(s.practica.key) }, "Ir a la práctica en pareja") : null,
           h("a", { class: "btn btn--secundario", href: "#/inicio" }, "Volver a mis evaluaciones")
         )
-      );
-      zonaResultado.appendChild(caja);
+      ));
     }
 
-    raiz.appendChild(h("div", { class: "contenedor" },
+    raiz.appendChild(contenedor(
       h("div", { class: "volver" }, h("a", { class: "enlace", href: "#/inicio" }, "← Mis evaluaciones")),
       h("header", { class: "franja" },
         h("p", { class: "etiqueta", text: s.fase + " · " + s.etiqueta + " · " + s.mode }),
         h("h1", { class: "display display--m", text: s.title }),
         h("p", { text: s.desc }),
-        modoRepaso ? h("p", { class: "aviso aviso--info", text: "Ya registraste esta evaluación (" + notaRemota + "%). Puedes responderla como repaso: esta vez no se envía." }) : null,
+        !previo && modoRepaso ? h("p", { class: "aviso aviso--info", text: "Ya registraste esta evaluación (" + notaRegistrada + "%). Puedes responderla como repaso: tu nota no cambia." }) : null,
         s.practica ? h("p", { class: "texto-apoyo" }, "Práctica en pareja: ", h("a", { class: "enlace", href: "#/practica/" + encodeURIComponent(s.practica.key) }, s.practica.titulo)) : null
       ),
       h("div", { class: "progreso" }, h("div", { class: "progreso__barra" }, relleno), textoProg),
       lista,
       evaluada ? null : botonEvaluar,
+      evaluada ? null : estadoEnvio,
       zonaResultado
     ));
     pintarPreguntas();
     actualizarProgreso();
-    if (previo) {
-      pintarResultado(previo.score.correct, previo.score.pct);
-      var enCola = leer("mivam_pendientes", []).some(function (x) { return x.id === normalizar(persona().nombre) + "|" + key; });
-      if (previo.enviado) pintarEstado("ok", "Resultado guardado en el registro del área.");
-      else if (enCola) pintarEstado("error", "Este resultado todavía no llega al registro.", function () { enviarResultado(previo.score.correct, previo.score.pct); });
-      else pintarEstado("info", "Resultado guardado en este dispositivo.");
-    }
+    if (previo) pintarResultado();
   }
 
   function destellos() {
@@ -446,26 +571,25 @@
     var hallado = buscarPractica(key);
     if (!hallado) return ir("#/inicio");
     var pr = hallado.practica;
-    var p = persona();
-    var borradorClave = "mivam_borrador_" + key + "_" + normalizar(p.nombre);
+    var borradorClave = claveLocal("borrador_" + key);
     var borrador = leer(borradorClave, {});
     var obs = textosObservacion(pr);
     vaciar(raiz);
 
     function control(id, tipo, extra) {
-      var attrs = Object.assign({ class: "control", id: id, name: id }, extra || {});
+      var attrs = Object.assign({ class: "control", id: id, name: id, maxlength: "2000" }, extra || {});
       var el = tipo === "parrafo" ? h("textarea", attrs) : h("input", Object.assign({ type: "text" }, attrs));
       if (borrador[id]) el.value = borrador[id];
       el.addEventListener("input", function () { borrador[id] = el.value; guardar(borradorClave, borrador); });
       return el;
     }
 
-    var compa = control("integrante-2", "texto", { placeholder: "Nombre y apellido", autocomplete: "off" });
+    var compa = control("integrante-2", "texto", { placeholder: "Nombre y apellido", autocomplete: "off", maxlength: "160" });
     var form = h("form", { class: "formulario", novalidate: true });
     form.appendChild(h("div", { class: "bloque" },
       h("h3", { text: "Integrantes" }),
       h("div", { class: "fila-dos" },
-        h("div", { class: "campo" }, h("label", { text: "Tú" }), h("input", { class: "control", type: "text", value: p.nombre, disabled: true })),
+        h("div", { class: "campo" }, h("label", { for: "integrante-1", text: "Tú" }), h("input", { class: "control", id: "integrante-1", type: "text", value: cuenta.perfil.nombre, disabled: true })),
         h("div", { class: "campo" }, h("label", { for: "integrante-2", text: "Tu pareja (o pareja y tercer integrante)" }), compa)
       )
     ));
@@ -479,7 +603,7 @@
           bloque.appendChild(h("div", { class: "campo" }, h("label", { for: c.id + "-" + i, text: "Pieza " + i }), control(c.id + "-" + i, "texto")));
         }
       } else if (c.tipo === "observacion") {
-        var sel = h("select", { class: "control", id: c.id + "-repite", name: c.id + "-repite" },
+        var sel = h("select", { class: "control", id: c.id + "-repite", name: c.id + "-repite", "aria-label": c.label + " · " + obs.pregunta },
           h("option", { value: "", text: obs.pregunta }), h("option", { value: "Sí", text: "Sí" }), h("option", { value: "Casi", text: "Casi" }), h("option", { value: "No", text: "No" }));
         if (borrador[c.id + "-repite"]) sel.value = borrador[c.id + "-repite"];
         sel.addEventListener("change", function () { borrador[sel.id] = sel.value; guardar(borradorClave, borrador); });
@@ -512,48 +636,52 @@
           fields.push({ label: c.label, value: (form.elements[c.id].value || "").trim() });
         }
       });
-      var payload = { action: "practica", activityKey: key, members: p.nombre + " · " + compa.value.trim(), fields: fields };
       boton.disabled = true;
       vaciar(estado);
       estado.appendChild(h("span", { class: "cargando", "aria-hidden": "true" }));
       estado.appendChild(h("p", { class: "aviso aviso--info", role: "status", text: "Enviando la práctica…" }));
-      enviar(payload).then(function () {
+      api("practica", { activityKey: key, pareja: compa.value.trim(), fields: fields }).then(function () {
         quitar(borradorClave);
         vaciar(estado);
-        estado.appendChild(h("p", { class: "aviso aviso--ok", role: "status", text: "¡Práctica enviada! Ya aparece en el proyector para la puesta en común." }));
+        estado.appendChild(h("p", { class: "aviso aviso--ok", role: "status", text: "¡Práctica enviada! El líder la mostrará en pantalla durante la puesta en común." }));
+        if (cuenta.admin) estado.appendChild(h("a", { class: "btn btn--secundario btn--chico", href: "#/proyector/" + encodeURIComponent(key) }, "Abrir el proyector"));
         boton.textContent = "Enviada";
-      }).catch(function () {
+      }).catch(function (err) {
         boton.disabled = false;
         vaciar(estado);
-        estado.appendChild(h("p", { class: "aviso aviso--error", role: "alert", text: "No se pudo enviar. Tus respuestas siguen guardadas en este dispositivo: revisa la conexión y vuelve a intentarlo." }));
+        estado.appendChild(h("p", { class: "aviso aviso--error", role: "alert", text: "No se pudo enviar: " + err.message + " Tus respuestas siguen guardadas en este dispositivo." }));
       });
     });
 
-    raiz.appendChild(h("div", { class: "contenedor" },
+    raiz.appendChild(contenedor(
       h("div", { class: "volver" }, h("a", { class: "enlace", href: "#/sesion/" + encodeURIComponent(hallado.sesion.key) }, "← " + hallado.sesion.etiqueta)),
       h("header", { class: "franja" },
         h("p", { class: "etiqueta", text: "Práctica en pareja · " + hallado.sesion.etiqueta }),
         h("h1", { class: "display display--m", text: pr.titulo }),
         h("p", { text: pr.instrucciones }),
-        h("p", { class: "texto-apoyo", text: "Lo que escriban se guarda en este dispositivo mientras trabajan. Una sola persona de la pareja envía la práctica." })
+        h("p", { class: "texto-apoyo", text: "Lo que escriban se guarda en este dispositivo mientras trabajan. Una sola persona de la pareja envía la práctica." }),
+        cuenta.admin ? h("p", { class: "texto-apoyo" }, "Líder: ", h("a", { class: "enlace", href: "#/proyector/" + encodeURIComponent(key) }, "abrir la puesta en común en el proyector")) : null
       ),
       form
     ));
   }
 
-  /* ---------- Vista: proyector (puesta en común) ---------- */
-  var temporizador = null;
+  /* ---------- Vista: proyector (puesta en común, solo administradores) ---------- */
   function vistaProyector(key) {
-    clearInterval(temporizador);
     vaciar(barraUsuario);
     var hallado = buscarPractica(key);
     vaciar(raiz);
-    if (!hallado) { raiz.appendChild(h("div", { class: "contenedor" }, h("p", { text: "No existe esa práctica." }))); return; }
+    if (!hallado) { raiz.appendChild(contenedor(h("p", { text: "No existe esa práctica." }))); return; }
+    if (!cuenta.admin) {
+      raiz.appendChild(contenedor(h("p", { class: "aviso aviso--error", role: "alert", text: "El proyector es solo para el líder y los miembros fijos del área." }),
+        h("a", { class: "enlace", href: "#/inicio" }, "← Mis evaluaciones")));
+      return;
+    }
     var pr = hallado.practica;
     var estado = h("p", { class: "texto-apoyo", text: "Cargando respuestas…" });
     var conteo = h("div", { class: "conteo" });
     var muro = h("div", { class: "muro" });
-    raiz.appendChild(h("div", { class: "contenedor" },
+    raiz.appendChild(contenedor(
       h("p", { class: "etiqueta", text: "Puesta en común · " + hallado.sesion.etiqueta }),
       h("h1", { class: "display display--l", text: pr.titulo }),
       estado, conteo, muro
@@ -567,10 +695,9 @@
     var cDetalle = aProyectar.filter(function (c) { return c !== cTitulo; });
 
     function cargar() {
-      fetch(GOOGLE_SCRIPT_URL + "?action=practicas&actividad=" + encodeURIComponent(key))
-        .then(function (r) { return r.json(); })
+      api("practicas", { actividad: key })
         .then(function (res) {
-          var items = (res && res.items) || [];
+          var items = res.items || [];
           estado.textContent = items.length + (items.length === 1 ? " pareja ha enviado" : " parejas han enviado") + " · se actualiza cada 15 segundos";
           vaciar(conteo);
           etiquetasObs.forEach(function (c) {
@@ -583,29 +710,19 @@
               h("p", { class: "pareja__marca", text: (cTitulo && it[cTitulo.label]) || "Sin marca" }),
               h("p", { class: "texto-apoyo", text: it["Integrantes"] || "" }),
               h("dl", null, cDetalle.map(function (c) {
-                return [h("dt", { text: typeof c.proyectar === "string" ? c.proyectar : sinPrefijo(c.label) }), h("dd", { text: it[c.label] || "—" })];
+                return [h("dt", { text: typeof c.proyectar === "string" ? c.proyectar : sinPrefijo(c.label) }), h("dd", { text: String(it[c.label] || "—") })];
               }))
             ));
           });
         })
-        .catch(function () { estado.textContent = "No se pudieron cargar las respuestas. Reintentando…"; });
+        .catch(function (e) { if (e.codigo !== "sesion") estado.textContent = "No se pudieron cargar las respuestas (" + e.message + "). Reintentando…"; });
     }
     cargar();
     temporizador = setInterval(function () { if (location.hash.indexOf("#/proyector/") === 0) cargar(); else clearInterval(temporizador); }, 15000);
   }
 
   /* ---------- Arranque ---------- */
-  function migrarVersionAnterior() {
-    // La app anterior guardaba «current_applicant» con nombre y fecha de nacimiento.
-    var viejo = leer("current_applicant", null);
-    if (viejo && !persona()) guardar("mivam_persona", { nombre: viejo.name, nacimiento: viejo.dob });
-    quitar("current_applicant");
-    quitar("quiz_db");
-  }
-
   migrarVersionAnterior();
+  if (sesion && !sesionVigente()) cerrarSesion(false);
   render();
-  reintentarPendientes().then(function () { return traerProgresoRemoto(); }).then(function () {
-    if (/^#\/?(inicio)?$/.test(location.hash) || location.hash === "") render();
-  });
 })();
