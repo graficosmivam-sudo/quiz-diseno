@@ -10,7 +10,7 @@
   // ==========================================
   var GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbymxEza1msJmXFQpm4_wxw0LCVmJriMO7HcVTYXrt5PXCSgo1YdZHFCFnjgMQwlr3A2Fw/exec";
   // ID de cliente OAuth («Aplicación web») de Google Cloud. No es secreto. Ver seguridad/README.md.
-  var GOOGLE_CLIENT_ID = "250612702128-ifn2gvge64vdkhq2tflpmli14rub53a8.apps.googleusercontent.com";
+  var GOOGLE_CLIENT_ID = "250612702128-jo3n072cb0becb5duflflc363lebemgv.apps.googleusercontent.com";
 
   var CURSOS = window.CURSOS || [];
   var raiz = document.getElementById("app");
