@@ -104,6 +104,13 @@ h2, h3, p { margin: 0; }
 .ingreso__intro { display: flex; flex-direction: column; gap: var(--space-6); }
 .ingreso__intro img { width: 100%; max-width: 520px; mix-blend-mode: multiply; }
 .panel { border: var(--linea) solid var(--negro); border-radius: var(--radius-md); padding: var(--space-6); display: flex; flex-direction: column; gap: var(--space-4); background: var(--blanco); }
+.panel--angosto { max-width: 520px; }
+.ingreso__subtitulo { font-size: 22px; font-weight: 700; }
+.ingreso__bajada { font-size: 18px; max-width: 40ch; }
+.boton-google { min-height: 44px; }
+.casilla { display: flex; gap: var(--space-3); align-items: flex-start; font-size: 14px; cursor: pointer; }
+.casilla input { width: 20px; height: 20px; margin: 2px 0 0; flex: none; accent-color: var(--negro); }
+.noscript { padding: var(--space-4); }
 .campo { display: flex; flex-direction: column; gap: var(--space-1); }
 .campo label { font-weight: 600; font-size: 14px; }
 .campo .ayuda { font-size: 13px; color: var(--texto-secundario); }
