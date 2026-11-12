@@ -561,7 +561,8 @@
 
     var obs = textosObservacion(pr);
     var etiquetasObs = pr.campos.filter(function (c) { return c.tipo === "observacion"; });
-    // La tarjeta de cada pareja muestra los campos con «proyectar»: el primero de tipo texto es el título.
+    // La tarjeta de cada pareja muestra los campos con «proyectar», con su label (o el texto de «proyectar» si es un texto).
+    // El primero de tipo texto es el título; si no hay, el título son los integrantes. Los campos vacíos no se muestran.
     var aProyectar = pr.campos.filter(function (c) { return c.proyectar; });
     var cTitulo = aProyectar.find(function (c) { return c.tipo === "texto"; });
     var cDetalle = aProyectar.filter(function (c) { return c !== cTitulo; });
@@ -571,7 +572,7 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
           var items = (res && res.items) || [];
-          estado.textContent = items.length + (items.length === 1 ? " pareja ha enviado" : " parejas han enviado") + " · se actualiza cada 15 segundos";
+          estado.textContent = items.length + (items.length === 1 ? " envío" : " envíos") + " · se actualiza cada 15 segundos";
           vaciar(conteo);
           etiquetasObs.forEach(function (c) {
             var si = items.filter(function (it) { return it[c.label + " · " + obs.pregunta] === "Sí"; }).length;
@@ -579,12 +580,17 @@
           });
           vaciar(muro);
           items.slice().reverse().forEach(function (it) {
+            var titulo = cTitulo && String(it[cTitulo.label] || "").trim();
+            var llenos = cDetalle.filter(function (c) { return String(it[c.label] || "").trim(); });
+            if (!titulo && !llenos.length) return; // p. ej. la prueba de estrés del M05: ya se ve en los conteos
             muro.appendChild(h("article", { class: "pareja" },
-              h("p", { class: "pareja__marca", text: (cTitulo && it[cTitulo.label]) || "Sin marca" }),
-              h("p", { class: "texto-apoyo", text: it["Integrantes"] || "" }),
-              h("dl", null, cDetalle.map(function (c) {
-                return [h("dt", { text: typeof c.proyectar === "string" ? c.proyectar : sinPrefijo(c.label) }), h("dd", { text: it[c.label] || "—" })];
-              }))
+              titulo ? h("p", { class: "pareja__marca", text: titulo }) : h("p", { class: "pareja__equipo", text: it["Integrantes"] || "Sin nombre" }),
+              titulo ? h("p", { class: "texto-apoyo", text: it["Integrantes"] || "" }) : null,
+              llenos.length
+                ? h("dl", null, llenos.map(function (c) {
+                    return [h("dt", { text: typeof c.proyectar === "string" ? c.proyectar : c.label }), h("dd", { text: String(it[c.label]).trim() })];
+                  }))
+                : null
             ));
           });
         })
