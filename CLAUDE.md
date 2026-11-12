@@ -17,7 +17,7 @@ App web de evaluaciones y seguimiento de capacitación del Área de Diseño Grá
 
 ## Estructura
 - `index.html`, `estilos.css` y `app.js`: rutas por hash (`#/inicio`, `#/sesion/<clave>`, `#/practica/<clave>`, `#/proyector/<clave>`).
-- `contenido/*.js`: un archivo por programa o módulo que agrega a `window.CURSOS`. Claves: `S01`–`S06` (Photoshop, fijas en las columnas E–J de la hoja) y `M01-manual`, `M02-manual`… para los módulos del curso «De la marca al manual». Las prácticas en pareja usan `M01-logo`, `M02-radiografia`… El proyector muestra los campos con `proyectar` (ver README).
+- `contenido/*.js`: un archivo por programa o módulo que agrega a `window.CURSOS`. Claves: `S01`–`S06` (Photoshop, fijas en las columnas E–J de la hoja) y `M01-manual`…`M05-manual` para los módulos del curso «De la marca al manual» (M03–M05 en `manual-m03-m05.js`). Las prácticas en pareja usan `M01-logo`, `M02-radiografia`, `M03-revision`, `M04-ruta`, `M05-sistema`… El proyector muestra los campos con `proyectar` (ver README).
 - `apps-script/Codigo.gs`: `doPost` (acciones `quiz` y `practica`, además del formato antiguo) y `doGet` (`progreso`, `practicas`, `ping`). `ping` devuelve `VERSION`: súbela en cada cambio para confirmar qué versión está publicada.
 
 ## Hoja de resultados («Base de Datos - Quiz Diseño»)
